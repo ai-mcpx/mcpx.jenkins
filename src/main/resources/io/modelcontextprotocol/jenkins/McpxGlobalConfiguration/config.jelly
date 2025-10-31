@@ -12,25 +12,5 @@
     <f:entry title="CLI Path" field="cliPath" help="/plugin/mcpx-jenkins/help/global/cliPath.html">
       <f:textbox default="~/.local/bin/mcpx-cli"/>
     </f:entry>
-    <f:entry title="CLI Download URL" field="cliDownloadUrl" help="/plugin/mcpx-jenkins/help/global/cliDownloadUrl.html">
-      <f:textbox/>
-    </f:entry>
-    <f:entry title="">
-      <f:validateButton title="Test CLI" method="testCli" with="cliPath"/>
-    </f:entry>
-    <f:entry title="">
-      <f:validateButton title="Update CLI" method="updateCli" with="cliPath,cliDownloadUrl"/>
-    </f:entry>
-    <f:entry title="Auto-update CLI" field="autoUpdateCli">
-      <f:checkbox default="false"/>
-    </f:entry>
-    <f:advanced>
-      <f:entry title="CLI Username" field="cliUsername" help="/plugin/mcpx-jenkins/help/global/cliUsername.html">
-        <f:textbox/>
-      </f:entry>
-      <f:entry title="CLI Password" field="cliPassword" help="/plugin/mcpx-jenkins/help/global/cliPassword.html">
-        <f:password/>
-      </f:entry>
-    </f:advanced>
   </f:section>
 </j:jelly>

@@ -8,9 +8,7 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 - [Quick Start](#quick-start)
 - [MCPX CLI Integration](#mcpx-cli-integration)
   - [Login behavior](#login-behavior)
-  - [Installation and updates](#installation-and-updates)
   - [Job-level overrides](#job-level-overrides)
-  - [Testing the CLI](#testing-the-cli)
   - [Why CLI instead of HTTP?](#why-cli-instead-of-http)
 - [Jenkinsfile example](#jenkinsfile-example)
 - [Development](#development)
@@ -18,12 +16,11 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 
 ## Features
 
-- Global configuration for registry base URL (required, no default)
+- Global configuration for registry base URL
 - Parameterized job input to select an MCP server from the registry
 - Exposes the selected value as environment variables: `$MCPX_SERVER_NAME` and `$<PARAM_NAME>`
-- mcpx-cli integration: configure CLI path, download/update CLI, and test CLI
-- Job-level overrides: per-job CLI settings (path, registry URL, credentials)
-- Auth for CLI download: optional username/password for protected download URLs (Basic Auth)
+- mcpx-cli integration: configure CLI path
+- Job-level overrides: per-job CLI settings (path, registry URL)
 
 ## Quick Start
 
@@ -39,20 +36,17 @@ The resulting `.hpi` will be under `target/`.
 - Manage Jenkins → Plugins → Advanced → Upload Plugin → select the built `.hpi`.
 
 3) Configure the registry
-- Manage Jenkins → System → MCPX Registry: set the Registry Base URL (required, no default).
+- Manage Jenkins → System → MCPX Registry: set the Registry Base URL
 
-4) Configure mcpx-cli (required)
+4) Configure mcpx-cli
 - Manage Jenkins → System → MCPX CLI:
   - CLI Path: path to mcpx-cli (default: `~/.local/bin/mcpx-cli`)
-  - CLI Download URL: (optional, leave empty unless you want to override download location)
-  - Test CLI: verify the CLI is working
-  - Update CLI: download/update from the given URL
-  - Auto-update CLI: keep CLI up to date automatically
-  - Advanced: optional username/password for downloading the CLI (HTTP Basic Auth)
 
 5) Add a parameter to a job
 - Configure job → This build is parameterized → Add parameter → “MCP Servers from MCPX Registry”
-- Choose a name (e.g., `MCP_SERVER`) and optionally set a default. The dropdown shows only the final segment of each server name (e.g., `gerrit-mcp-server` for `io.modelcontextprotocol.anonymous/gerrit-mcp-server`), while the stored value is the full name.
+- In the parameter configuration, use the “MCP Servers” dropdown to choose a server (list is fetched via mcpx-cli)
+- Click “Refresh” to fetch the latest servers from the registry; if the list doesn’t update immediately, save and reopen or reload the page
+- The dropdown displays the short server name (final path segment), but the stored value is the full name (e.g., shows `gerrit-mcp-server`, stores `io.modelcontextprotocol.anonymous/gerrit-mcp-server`)
 
 6) Use it in a build step
 
@@ -69,39 +63,17 @@ mcpx-cli --base-url=<your-registry> login --method anonymous
 mcpx-cli --base-url=<your-registry> servers --json
 ```
 
-### Installation and updates
-
-System-level (Global):
-1. Manage Jenkins → System → MCPX CLI
-2. Set CLI Path (e.g., `~/.local/bin/mcpx-cli` or another location)
-3. (Optional) Set Download URL for your platform if you want to override the default download location
-4. Click Test CLI to verify installation
-5. Click Update CLI to download/install the CLI
-
-Auto-update: enable “Auto-update CLI” to download the latest CLI before each use.
-
 ### Job-level overrides
 
 Jobs can override global CLI settings:
-1. Configure job → check “Override MCPX CLI Configuration”
+1. Configure job → check "MCPX Registry Plugin Configuration"
 2. Set any of:
   - CLI Path (e.g., a different version)
-  - Registry Base URL (required)
-  - CLI Download URL (optional, leave empty unless needed)
-  - Username/Password for CLI download if needed (not for login)
-
-### Testing the CLI
-
-Use the Test CLI button to verify:
-- CLI executable is accessible
-- CLI runs successfully
-- CLI version information
-
-Example output:
-
-```
-mcpx-cli is working! Version: mcpx-cli version 0.1.0
-```
+  - Registry Base URL (to use a different registry for this job)
+  - CLI Download URL (optional, required if using Update CLI)
+  - Use the Test CLI button to verify the CLI works at the configured path
+    - You can choose a Node (agent) to run the test on; this is useful when mcpx-cli is installed on an agent rather than the controller. If no node is chosen, the test runs on the controller.
+  - Use the Update CLI button to download/install the CLI to the configured path (requires a download URL)
 
 ### Why CLI instead of HTTP?
 

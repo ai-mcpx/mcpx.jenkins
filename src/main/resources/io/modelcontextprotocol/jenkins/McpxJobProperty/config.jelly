@@ -1,19 +1,31 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j='jelly:core' xmlns:f='/lib/form'>
-  <f:optionalBlock name="mcpxJobProperty" title="Override MCPX CLI Configuration" checked="${instance != null}">
+  <f:optionalBlock name="mcpxJobProperty" title="MCPX Registry Plugin Configuration" checked="${instance != null}">
+    <f:entry>
+      <div>Enable job-specific configuration. If disabled, global configuration will be used.</div>
+    </f:entry>
     <f:entry title="CLI Path" field="cliPath" help="/plugin/mcpx-jenkins/help/job/cliPath.html">
       <f:textbox/>
+    </f:entry>
+    <f:entry title="Node (for Test CLI)" help="Select the node/agent where to run the Test CLI check.">
+      <f:select name="testNodeName" class="setting-input">
+        <f:option selected="true" value="(built-in)">Built-in Node (controller)</f:option>
+        <j:forEach var="n" items="${app.nodes}">
+          <f:option value="${n.nodeName}">${n.nodeName}</f:option>
+        </j:forEach>
+      </f:select>
     </f:entry>
     <f:entry title="Registry Base URL" field="registryBaseUrl" help="/plugin/mcpx-jenkins/help/job/registryBaseUrl.html">
       <f:textbox/>
     </f:entry>
-    <f:advanced>
-      <f:entry title="CLI Username" field="cliUsername">
-        <f:textbox/>
-      </f:entry>
-      <f:entry title="CLI Password" field="cliPassword">
-        <f:password/>
-      </f:entry>
-    </f:advanced>
+    <f:entry title="CLI Download URL" field="cliDownloadUrl" help="/plugin/mcpx-jenkins/help/job/cliDownloadUrl.html">
+      <f:textbox/>
+    </f:entry>
+    <f:entry>
+      <f:validateButton title="Test CLI" method="testCli" with="cliPath,testNodeName"/>
+    </f:entry>
+    <f:entry>
+      <f:validateButton title="Update CLI" method="updateCli" with="cliPath,cliDownloadUrl"/>
+    </f:entry>
   </f:optionalBlock>
 </j:jelly>

@@ -4,12 +4,14 @@ import hudson.Extension;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParameterValue;
 import hudson.model.SimpleParameterDefinition;
+import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import io.modelcontextprotocol.jenkins.McpxRegistryClient;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.verb.POST;
 
 import javax.annotation.Nonnull;
 
@@ -65,6 +67,17 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
 
         public ListBoxModel doFillValueItems(@QueryParameter String value) {
             return new McpxRegistryClient().fetchServers();
+        }
+
+        @POST
+        public FormValidation doRefreshServers() {
+            try {
+                // Trigger a fresh fetch to validate availability; UI will repopulate on reload
+                new McpxRegistryClient().fetchServers();
+                return FormValidation.ok("Refreshed MCP servers from registry. If options didn't update, reload this page.");
+            } catch (Exception e) {
+                return FormValidation.error("Failed to refresh servers: " + e.getMessage());
+            }
         }
     }
 }
