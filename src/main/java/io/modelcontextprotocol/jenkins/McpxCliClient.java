@@ -14,7 +14,12 @@ public class McpxCliClient {
     private final String cliPath;
 
     public McpxCliClient(String cliPath) {
-        this.cliPath = Util.fixEmptyAndTrim(cliPath) != null ? cliPath : "mcpx-cli";
+        String p = Util.fixEmptyAndTrim(cliPath);
+        if (p == null) {
+            this.cliPath = "mcpx-cli";
+        } else {
+            this.cliPath = expandHome(p);
+        }
     }
 
     public String getVersion() throws IOException, InterruptedException {
@@ -80,6 +85,16 @@ public class McpxCliClient {
         if (exitCode != 0) {
             throw new IOException("mcpx-cli login failed with exit code " + exitCode + ": " + output.toString(StandardCharsets.UTF_8));
         }
+    }
+
+    private static String expandHome(String path) {
+        if (path != null && path.startsWith("~/")) {
+            String home = System.getProperty("user.home");
+            if (home != null && !home.isEmpty()) {
+                return home + path.substring(1);
+            }
+        }
+        return path;
     }
 
     private int execute(ArgumentListBuilder args, ByteArrayOutputStream output, TaskListener listener) throws IOException, InterruptedException {

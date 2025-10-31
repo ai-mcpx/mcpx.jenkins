@@ -72,7 +72,6 @@ Jobs can override global CLI settings:
   - Registry Base URL (to use a different registry for this job)
   - CLI Download URL (optional, required if using Update CLI)
   - Use the Test CLI button to verify the CLI works at the configured path
-    - You can choose a Node (agent) to run the test on; this is useful when mcpx-cli is installed on an agent rather than the controller. If no node is chosen, the test runs on the controller.
   - Use the Update CLI button to download/install the CLI to the configured path (requires a download URL)
 
 ### Why CLI instead of HTTP?

@@ -7,12 +7,13 @@ import hudson.model.JobProperty;
 import hudson.model.JobPropertyDescriptor;
 import hudson.util.FormValidation;
 import net.sf.json.JSONObject;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.verb.POST;
+
 import javax.annotation.Nonnull;
-import java.io.IOException;
 
 public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
     private final String cliPath;
@@ -46,14 +47,13 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
             return "MCPX CLI Configuration";
         }
 
-        // Only override the method for AbstractProject, as JobPropertyDescriptor expects
         @Override
         public boolean isApplicable(Class jobType) {
             return AbstractProject.class.isAssignableFrom(jobType);
         }
 
         @Override
-        public JobProperty<?> newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+        public JobProperty<?> newInstance(StaplerRequest req, net.sf.json.JSONObject formData) throws FormException {
             if (formData == null || formData.isNullObject()) {
                 return null;
             }
@@ -61,49 +61,49 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
         }
 
         @POST
-        public FormValidation doTestCli(@QueryParameter String cliPath, @QueryParameter String testNodeName) {
+        public FormValidation doTestCli(@AncestorInPath AbstractProject<?, ?> project, @QueryParameter String cliPath) {
             try {
                 String path = Util.fixEmptyAndTrim(cliPath);
-                if (path == null) path = "mcpx-cli";
-
-                // If a node was selected, attempt to run the test on that node
-                String nodeName = Util.fixEmptyAndTrim(testNodeName);
-                if (nodeName != null) {
-                    jenkins.model.Jenkins j = jenkins.model.Jenkins.get();
-                    hudson.model.Node node = "(built-in)".equals(nodeName) ? j : j.getNode(nodeName);
-                    if (node != null && node.toComputer() != null && node.toComputer().isOnline()) {
-                        hudson.FilePath root = node.getRootPath();
-                        if (root != null) {
-                            String version = root.act(new CliVersionCallable(path));
-                            return FormValidation.ok("mcpx-cli is working on node '" + nodeName + "'! Version: " + version);
-                        }
-                    }
-                    // If node not available fall back to controller
+                if (path == null) {
+                    // Fall back to global configuration if job-specific path not provided
+                    McpxGlobalConfiguration cfg = McpxGlobalConfiguration.get();
+                    String globalPath = (cfg != null) ? Util.fixEmptyAndTrim(cfg.getCliPath()) : null;
+                    path = (globalPath != null) ? globalPath : "mcpx-cli";
                 }
 
-                // Fallback: run on controller
-                McpxCliClient client = new McpxCliClient(expandTilde(path));
-                String version = client.getVersion();
-                return FormValidation.ok("mcpx-cli is working on controller! Version: " + version);
+                jenkins.model.Jenkins j = jenkins.model.Jenkins.get();
+                hudson.model.Node target = null;
+
+                if (project != null) {
+                    hudson.model.Label assigned = project.getAssignedLabel();
+                    if (assigned != null) {
+                        for (hudson.model.Node n : assigned.getNodes()) {
+                            if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
+                                target = n;
+                                break;
+                            }
+                        }
+                        if (target == null) {
+                            return FormValidation.error("No online agents match the job's label: '" + assigned.getExpression() + "'.");
+                        }
+                    }
+                }
+
+                if (target == null) {
+                    target = j; // fallback to controller
+                }
+
+                hudson.FilePath root = target.getRootPath();
+                if (root == null) {
+                    return FormValidation.error("Unable to access workspace on target node.");
+                }
+
+                String version = root.act(new CliVersionCallable(path));
+                String where = (target == j) ? "controller" : target.getNodeName();
+                return FormValidation.ok("mcpx-cli is working on " + where + "! Version: " + version);
             } catch (Exception e) {
                 return FormValidation.error("Failed to execute mcpx-cli: " + e.getMessage());
             }
-        }
-
-        // Optional: provide a node list for dynamic dropdowns (not required by current jelly)
-        public hudson.util.ListBoxModel doFillTestNodeNameItems() {
-            hudson.util.ListBoxModel m = new hudson.util.ListBoxModel();
-            jenkins.model.Jenkins j = jenkins.model.Jenkins.get();
-            m.add("Built-in Node (controller)", "(built-in)");
-            for (hudson.model.Node n : j.getNodes()) {
-                String name = n.getNodeName();
-                String display = name;
-                if (n.toComputer() != null && !n.toComputer().isOnline()) {
-                    display = name + " (offline)";
-                }
-                m.add(display, name);
-            }
-            return m;
         }
 
         private static String expandTilde(String path) {
@@ -160,7 +160,7 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
                             err.write(buf, 0, r);
                         }
                     }
-            throw new java.io.IOException("mcpx-cli --version failed with exit code " + code + ": " + err.toString(java.nio.charset.StandardCharsets.UTF_8));
+                    throw new java.io.IOException("mcpx-cli --version failed with exit code " + code + ": " + err.toString(java.nio.charset.StandardCharsets.UTF_8));
                 }
                 return baos.toString(java.nio.charset.StandardCharsets.UTF_8).trim();
             }
