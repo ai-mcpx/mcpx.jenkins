@@ -1,15 +1,18 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j='jelly:core' xmlns:f='/lib/form'>
-  <f:entry title="Name" field="name">
+  <!-- Keep name/description hidden: default the parameter name to MCP_SERVER and description empty -->
+  <f:invisibleEntry>
+    <f:textbox field="name" default="MCP_SERVER"/>
+    <f:textarea field="description" default=""/>
+  </f:invisibleEntry>
+  <f:entry title="Default MCP Server (full name)" field="defaultServer" help="/plugin/mcpx-jenkins/help/param/defaultServer.html">
     <f:textbox/>
   </f:entry>
-  <f:entry title="Description" field="description">
-    <f:textarea/>
-  </f:entry>
-  <f:entry title="MCP Servers" field="defaultServer" help="/plugin/mcpx-jenkins/help/param/defaultServer.html">
-    <f:select/>
+  <f:entry title="Available MCP Servers (read-only)">
+    <f:textarea value="${descriptor.getServersPreview()}" readonly="true"/>
   </f:entry>
   <f:entry>
     <f:validateButton title="Refresh" method="refreshServers"/>
+    <f:validateButton title="Probe" method="probeServers"/>
   </f:entry>
 </j:jelly>

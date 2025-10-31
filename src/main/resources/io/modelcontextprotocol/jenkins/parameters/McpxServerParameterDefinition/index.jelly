@@ -1,6 +1,18 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j='jelly:core' xmlns:f='/lib/form'>
   <f:entry title="${it.name}" description="${it.description}">
-    <f:select name="value"/>
+    <f:textbox name="value"/>
   </f:entry>
+  <f:entry title="Available MCP Servers (read-only)">
+    <f:textarea value="${descriptor.getServersPreview()}" readonly="true"/>
+  </f:entry>
+  <f:entry>
+    <f:validateButton title="Refresh" method="refreshServers"/>
+    <f:validateButton title="Probe" method="probeServers"/>
+  </f:entry>
+  <j:if test="${it.defaultServer != null && it.defaultServer != ''}">
+    <f:entry>
+      <div>Default: ${it.defaultServer}</div>
+    </f:entry>
+  </j:if>
 </j:jelly>

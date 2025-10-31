@@ -6,6 +6,7 @@ import hudson.model.AbstractProject;
 import hudson.model.JobProperty;
 import hudson.model.JobPropertyDescriptor;
 import hudson.util.FormValidation;
+import hudson.util.ListBoxModel;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -19,12 +20,14 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
     private final String cliPath;
     private final String registryBaseUrl;
     private final String cliDownloadUrl;
+    private final String selectedServer;
 
     @DataBoundConstructor
-    public McpxJobProperty(String cliPath, String registryBaseUrl, String cliDownloadUrl) {
+    public McpxJobProperty(String cliPath, String registryBaseUrl, String cliDownloadUrl, String selectedServer) {
         this.cliPath = Util.fixEmptyAndTrim(cliPath);
         this.registryBaseUrl = Util.fixEmptyAndTrim(registryBaseUrl);
         this.cliDownloadUrl = Util.fixEmptyAndTrim(cliDownloadUrl);
+        this.selectedServer = Util.fixEmptyAndTrim(selectedServer);
     }
 
     public String getCliPath() {
@@ -37,6 +40,10 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
 
     public String getCliDownloadUrl() {
         return cliDownloadUrl;
+    }
+
+    public String getSelectedServer() {
+        return selectedServer != null ? selectedServer : "";
     }
 
     @Extension
@@ -103,6 +110,32 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
                 return FormValidation.ok("mcpx-cli is working on " + where + "! Version: " + version);
             } catch (Exception e) {
                 return FormValidation.error("Failed to execute mcpx-cli: " + e.getMessage());
+            }
+        }
+
+        // Populate the job-level MCP Servers dropdown (workaround: select at job config)
+        public ListBoxModel doFillSelectedServerItems(@AncestorInPath AbstractProject<?, ?> project) {
+            try {
+                if (project != null) {
+                    return new McpxRegistryClient().fetchServers(project);
+                }
+                return new McpxRegistryClient().fetchServers();
+            } catch (Exception e) {
+                ListBoxModel m = new ListBoxModel();
+                m.add("<Failed to fetch via mcpx-cli: " + e.getMessage() + ">", "");
+                return m;
+            }
+        }
+
+        @POST
+        public FormValidation doRefreshServers(@AncestorInPath AbstractProject<?, ?> project) {
+            try {
+                hudson.util.ListBoxModel model = (project != null)
+                        ? new McpxRegistryClient().fetchServers(project)
+                        : new McpxRegistryClient().fetchServers();
+                return FormValidation.ok("Refreshed MCP servers (" + model.size() + ")");
+            } catch (Exception e) {
+                return FormValidation.error("Failed to refresh servers: " + e.getMessage());
             }
         }
 
