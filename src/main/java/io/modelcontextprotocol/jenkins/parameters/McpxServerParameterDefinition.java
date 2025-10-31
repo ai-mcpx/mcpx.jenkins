@@ -60,7 +60,7 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
         @Nonnull
         @Override
         public String getDisplayName() {
-            return "MCPX Server (from Registry)";
+            return "MCP Servers from MCPX Registry";
         }
 
         public ListBoxModel doFillValueItems(@QueryParameter String value) {

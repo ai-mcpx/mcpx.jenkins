@@ -60,9 +60,12 @@ public class McpxRegistryClient {
                         String name = s.optString("name");
                         if (name == null || name.isEmpty()) continue;
                         if (seen.add(name)) {
-                            String desc = s.optString("description");
-                                        String label = desc != null && !desc.isEmpty() ? name + " — " + desc : name;
-                            m.add(label, name);
+                            String shortName = name;
+                            int idx = name.lastIndexOf('/');
+                            if (idx >= 0 && idx < name.length() - 1) {
+                                shortName = name.substring(idx + 1);
+                            }
+                            m.add(shortName, name);
                         }
                     }
                 } else {
@@ -76,7 +79,12 @@ public class McpxRegistryClient {
                     String name = s.optString("name");
                     if (name == null || name.isEmpty()) continue;
                     if (seen.add(name)) {
-                        m.add(name, name);
+                        String shortName = name;
+                        int idx = name.lastIndexOf('/');
+                        if (idx >= 0 && idx < name.length() - 1) {
+                            shortName = name.substring(idx + 1);
+                        }
+                        m.add(shortName, name);
                     }
                 }
             } else {
@@ -93,7 +101,14 @@ public class McpxRegistryClient {
                 for (int i = 0; i < arr.size(); i++) {
                     JSONObject s = arr.getJSONObject(i);
                     String name = s.optString("name");
-                    if (name != null && !name.isEmpty()) m2.add(name, name);
+                    if (name != null && !name.isEmpty()) {
+                        String shortName = name;
+                        int idx = name.lastIndexOf('/');
+                        if (idx >= 0 && idx < name.length() - 1) {
+                            shortName = name.substring(idx + 1);
+                        }
+                        m2.add(shortName, name);
+                    }
                 }
                 if (m2.isEmpty()) m2.add("<parse error>", "");
                 return m2;

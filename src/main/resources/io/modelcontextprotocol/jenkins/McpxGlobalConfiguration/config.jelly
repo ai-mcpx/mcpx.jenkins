@@ -2,19 +2,18 @@
 <j:jelly xmlns:j='jelly:core' xmlns:f='/lib/form'>
   <f:section title="MCPX Registry">
     <f:entry title="Registry Base URL" field="registryBaseUrl" help="/plugin/mcpx-jenkins/help/global/registryBaseUrl.html">
-      <f:textbox default="https://registry.modelcontextprotocol.io"/>
+      <f:textbox/>
+      <f:validation method="checkRequired" depends="registryBaseUrl"/>
     </f:entry>
-    <f:entry title="HTTP Timeout (seconds)" field="httpTimeoutSeconds">
-      <f:number default="10" min="1"/>
-    </f:entry>
+
   </f:section>
 
   <f:section title="MCPX CLI">
     <f:entry title="CLI Path" field="cliPath" help="/plugin/mcpx-jenkins/help/global/cliPath.html">
-      <f:textbox default="mcpx-cli"/>
+      <f:textbox default="~/.local/bin/mcpx-cli"/>
     </f:entry>
     <f:entry title="CLI Download URL" field="cliDownloadUrl" help="/plugin/mcpx-jenkins/help/global/cliDownloadUrl.html">
-      <f:textbox default="https://github.com/ai-mcpx/mcpx-cli/releases/latest/download/mcpx-cli"/>
+      <f:textbox/>
     </f:entry>
     <f:entry title="">
       <f:validateButton title="Test CLI" method="testCli" with="cliPath"/>

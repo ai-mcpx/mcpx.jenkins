@@ -18,7 +18,7 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 
 ## Features
 
-- Global configuration for registry base URL
+- Global configuration for registry base URL (required, no default)
 - Parameterized job input to select an MCP server from the registry
 - Exposes the selected value as environment variables: `$MCPX_SERVER_NAME` and `$<PARAM_NAME>`
 - mcpx-cli integration: configure CLI path, download/update CLI, and test CLI
@@ -39,20 +39,20 @@ The resulting `.hpi` will be under `target/`.
 - Manage Jenkins → Plugins → Advanced → Upload Plugin → select the built `.hpi`.
 
 3) Configure the registry
-- Manage Jenkins → System → MCPX Registry: set the Registry Base URL (default: https://mcpx.example.com).
+- Manage Jenkins → System → MCPX Registry: set the Registry Base URL (required, no default).
 
 4) Configure mcpx-cli (required)
 - Manage Jenkins → System → MCPX CLI:
-  - CLI Path: path to mcpx-cli (default: `mcpx-cli` in PATH)
-  - CLI Download URL: platform-specific binary URL
+  - CLI Path: path to mcpx-cli (default: `~/.local/bin/mcpx-cli`)
+  - CLI Download URL: (optional, leave empty unless you want to override download location)
   - Test CLI: verify the CLI is working
   - Update CLI: download/update from the given URL
   - Auto-update CLI: keep CLI up to date automatically
   - Advanced: optional username/password for downloading the CLI (HTTP Basic Auth)
 
 5) Add a parameter to a job
-- Configure job → This build is parameterized → Add parameter → “MCPX Server (from Registry)”
-- Choose a name (e.g., `MCP_SERVER`) and optionally set a default.
+- Configure job → This build is parameterized → Add parameter → “MCP Servers from MCPX Registry”
+- Choose a name (e.g., `MCP_SERVER`) and optionally set a default. The dropdown shows only the final segment of each server name (e.g., `gerrit-mcp-server` for `io.modelcontextprotocol.anonymous/gerrit-mcp-server`), while the stored value is the full name.
 
 6) Use it in a build step
 
@@ -73,11 +73,8 @@ mcpx-cli --base-url=<your-registry> servers --json
 
 System-level (Global):
 1. Manage Jenkins → System → MCPX CLI
-2. Set CLI Path (e.g., `/usr/local/bin/mcpx-cli` or `mcpx-cli`)
-3. Set Download URL for your platform:
-   - Linux: `https://github.com/ai-mcpx/mcpx-cli/releases/latest/download/mcpx-cli-linux-amd64`
-   - macOS: `https://github.com/ai-mcpx/mcpx-cli/releases/latest/download/mcpx-cli-darwin-amd64`
-   - Windows: `https://github.com/ai-mcpx/mcpx-cli/releases/latest/download/mcpx-cli-windows-amd64.exe`
+2. Set CLI Path (e.g., `~/.local/bin/mcpx-cli` or another location)
+3. (Optional) Set Download URL for your platform if you want to override the default download location
 4. Click Test CLI to verify installation
 5. Click Update CLI to download/install the CLI
 
@@ -88,9 +85,10 @@ Auto-update: enable “Auto-update CLI” to download the latest CLI before each
 Jobs can override global CLI settings:
 1. Configure job → check “Override MCPX CLI Configuration”
 2. Set any of:
-   - CLI Path (e.g., a different version)
-   - Registry Base URL (e.g., staging vs prod)
-   - Username/Password for CLI download if needed (not for login)
+  - CLI Path (e.g., a different version)
+  - Registry Base URL (required)
+  - CLI Download URL (optional, leave empty unless needed)
+  - Username/Password for CLI download if needed (not for login)
 
 ### Testing the CLI
 

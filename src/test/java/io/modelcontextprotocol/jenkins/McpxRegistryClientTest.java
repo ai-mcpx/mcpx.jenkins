@@ -12,7 +12,7 @@ public class McpxRegistryClientTest {
         McpxRegistryClient c = new McpxRegistryClient();
         ListBoxModel m = c.parseServersJson(json);
         assertEquals(2, m.size());
-        assertEquals("io.modelcontextprotocol/filesystem — FS server", m.get(0).name);
+        assertEquals("filesystem", m.get(0).name);
         assertEquals("io.modelcontextprotocol/filesystem", m.get(0).value);
     }
 
@@ -22,7 +22,7 @@ public class McpxRegistryClientTest {
         McpxRegistryClient c = new McpxRegistryClient();
         ListBoxModel m = c.parseServersJson(json);
         assertEquals(2, m.size());
-        assertEquals("a/b", m.get(0).name);
+        assertEquals("b", m.get(0).name);
         assertEquals("a/b", m.get(0).value);
     }
 
@@ -33,6 +33,6 @@ public class McpxRegistryClientTest {
         McpxRegistryClient c = new McpxRegistryClient();
         ListBoxModel m = c.parseServersJson(json);
         assertEquals(1, m.size());
-        assertEquals("io.modelcontextprotocol/test — Test server", m.get(0).name);
+        assertEquals("test", m.get(0).name);
     }
 }

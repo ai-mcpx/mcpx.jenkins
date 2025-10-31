@@ -12,12 +12,12 @@ import org.kohsuke.stapler.verb.POST;
 
 @Extension
 public class McpxGlobalConfiguration extends GlobalConfiguration {
-    private String registryBaseUrl = "https://registry.modelcontextprotocol.io";
-    private int httpTimeoutSeconds = 10;
+    private String registryBaseUrl = "";
+
 
     // mcpx-cli configuration
-    private String cliPath = "mcpx-cli";
-    private String cliDownloadUrl = "https://github.com/ai-mcpx/mcpx-cli/releases/latest/download/mcpx-cli";
+    private String cliPath = "~/.local/bin/mcpx-cli";
+    private String cliDownloadUrl = "";
     private String cliUsername;
     private Secret cliPassword;
     private boolean autoUpdateCli = false;
@@ -38,13 +38,7 @@ public class McpxGlobalConfiguration extends GlobalConfiguration {
         this.registryBaseUrl = Util.fixEmptyAndTrim(registryBaseUrl);
     }
 
-    public int getHttpTimeoutSeconds() {
-        return httpTimeoutSeconds;
-    }
 
-    public void setHttpTimeoutSeconds(int httpTimeoutSeconds) {
-        this.httpTimeoutSeconds = httpTimeoutSeconds;
-    }
 
     public String getCliPath() {
         return cliPath;
@@ -84,6 +78,15 @@ public class McpxGlobalConfiguration extends GlobalConfiguration {
 
     public void setAutoUpdateCli(boolean autoUpdateCli) {
         this.autoUpdateCli = autoUpdateCli;
+    }
+
+    @POST
+    public FormValidation doCheckRequired(@QueryParameter String registryBaseUrl) {
+        String url = Util.fixEmptyAndTrim(registryBaseUrl);
+        if (url == null || url.isEmpty()) {
+            return FormValidation.error("Registry Base URL is required");
+        }
+        return FormValidation.ok();
     }
 
     @POST
