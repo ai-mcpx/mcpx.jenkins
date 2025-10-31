@@ -1,0 +1,142 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.jenkins-ci.plugins</groupId>
+    <artifactId>plugin</artifactId>
+    <version>4.78</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>io.modelcontextprotocol</groupId>
+  <artifactId>mcpx-jenkins</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>hpi</packaging>
+
+  <name>MCPX Registry Jenkins Plugin</name>
+  <description>Provides a parameter to list and select MCP servers from an MCPX Registry for use in Jenkins jobs.</description>
+  <url>https://github.com/ai-mcpx/mcpx</url>
+
+  <properties>
+    <jenkins.version>2.414.3</jenkins.version>
+    <java.level>11</java.level>
+    <spotbugs.effort>Max</spotbugs.effort>
+    <spotbugs.threshold>Low</spotbugs.threshold>
+  </properties>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>ai-mcpx</id>
+      <name>MCPX Contributors</name>
+      <url>https://github.com/ai-mcpx</url>
+    </developer>
+  </developers>
+
+  <repositories>
+    <repository>
+      <id>repo.jenkins-ci.org</id>
+      <url>https://repo.jenkins-ci.org/public/</url>
+    </repository>
+  </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>repo.jenkins-ci.org</id>
+      <url>https://repo.jenkins-ci.org/public/</url>
+    </pluginRepository>
+  </pluginRepositories>
+
+  <scm>
+    <connection>scm:git:git://github.com/ai-mcpx/mcpx.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/ai-mcpx/mcpx.git</developerConnection>
+    <url>https://github.com/ai-mcpx/mcpx</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.jenkins-ci.main</groupId>
+      <artifactId>jenkins-core</artifactId>
+      <version>${jenkins.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.kohsuke.stapler</groupId>
+      <artifactId>json-lib</artifactId>
+      <version>2.4-jenkins-3</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jenkins-ci.plugins</groupId>
+      <artifactId>structs</artifactId>
+      <version>337.v1b_04ea_4df7c8</version>
+      <!-- Jenkins plugin dependency must be compile scope so it is recorded in the manifest -->
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>2.0.12</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Test dependencies -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jenkins-ci.main</groupId>
+      <artifactId>jenkins-test-harness</artifactId>
+      <version>2519.v4ee63f85da_71</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>5.12.0</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
+        <configuration>
+          <excludes>
+            <!-- Exclude harness-generated Jelly InjectedTest which requires a Jetty provider not needed for unit tests -->
+            <exclude>**/InjectedTest.*</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.jenkins-ci.tools</groupId>
+        <artifactId>maven-hpi-plugin</artifactId>
+        <version>3.49</version>
+        <configuration>
+          <compatibleSinceVersion>0.1.0</compatibleSinceVersion>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <release>${java.level}</release>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

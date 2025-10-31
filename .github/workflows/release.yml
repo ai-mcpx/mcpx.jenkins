@@ -1,0 +1,65 @@
+name: mcpx.jenkins-release
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'maven'
+      - name: Display Maven and Java versions
+        run: |
+          mvn -v
+          java -version
+      - name: Build with Maven
+        run: |
+          mvn --batch-mode --update-snapshots clean package
+      - name: Find built HPI
+        id: find_hpi
+        run: |
+          HPI_FILE=$(ls target/*.hpi | head -n 1)
+          if [ -z "$HPI_FILE" ]; then
+            echo "No HPI found in target/" >&2
+            exit 1
+          fi
+          echo "hpi=$HPI_FILE" >> $GITHUB_OUTPUT
+          echo "Found HPI: $HPI_FILE"
+      - name: Generate checksums
+        run: |
+          cd target
+          for f in *.hpi; do
+            sha256sum "$f" > "$f.sha256"
+            sha1sum "$f" > "$f.sha1"
+          done
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-hpi
+          path: |
+            ${{ steps.find_hpi.outputs.hpi }}
+            ${{ steps.find_hpi.outputs.hpi }}.sha256
+            ${{ steps.find_hpi.outputs.hpi }}.sha1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          files: |
+            ${{ steps.find_hpi.outputs.hpi }}
+            ${{ steps.find_hpi.outputs.hpi }}.sha256
+            ${{ steps.find_hpi.outputs.hpi }}.sha1
+        env:
+          GITHUB_TOKEN: ${{ secrets.AI_MCPX_TOKEN }}

@@ -1,0 +1,19 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j='jelly:core' xmlns:f='/lib/form'>
+  <f:optionalBlock name="mcpxJobProperty" title="Override MCPX CLI Configuration" checked="${instance != null}">
+    <f:entry title="CLI Path" field="cliPath" help="/plugin/mcpx-jenkins/help/job/cliPath.html">
+      <f:textbox/>
+    </f:entry>
+    <f:entry title="Registry Base URL" field="registryBaseUrl" help="/plugin/mcpx-jenkins/help/job/registryBaseUrl.html">
+      <f:textbox/>
+    </f:entry>
+    <f:advanced>
+      <f:entry title="CLI Username" field="cliUsername">
+        <f:textbox/>
+      </f:entry>
+      <f:entry title="CLI Password" field="cliPassword">
+        <f:password/>
+      </f:entry>
+    </f:advanced>
+  </f:optionalBlock>
+</j:jelly>

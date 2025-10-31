@@ -1,0 +1,7 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j='jelly:core'>
+  <div>
+    <h1>MCPX Registry Jenkins Plugin</h1>
+    <p>Adds a build parameter to list and select MCP servers from an MCPX Registry.</p>
+  </div>
+</j:jelly>

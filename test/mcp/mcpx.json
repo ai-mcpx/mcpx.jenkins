@@ -1,0 +1,74 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.modelcontextprotocol.anonymous/gerrit-mcp-server",
+  "title": "Gerrit MCP Server",
+  "description": "MCP server for Gerrit code review system based on GerritCodeReview/gerrit-mcp-server",
+  "websiteUrl": "https://github.com/ai-mcpx/gerrit-mcp-server/",
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "docker",
+      "registryBaseUrl": "https://index.docker.io/v1/",
+      "identifier": "craftslab/gerrit-mcp-server",
+      "version": "1.0.0",
+      "runtimeHint": "docker",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--rm",
+          "description": "Remove container after exit",
+          "isRequired": true
+        },
+        {
+          "type": "positional",
+          "valueHint": "port_mapping",
+          "description": "Port mapping for the container",
+          "format": "string",
+          "default": "6322:6322",
+          "isRequired": true
+        },
+        {
+          "type": "positional",
+          "valueHint": "volume_mapping",
+          "description": "Volume mount for configuration access",
+          "format": "string",
+          "default": "${PWD}:/workspace",
+          "isRequired": false
+        },
+        {
+          "type": "positional",
+          "valueHint": "network_mode",
+          "description": "Network mode for Gerrit access",
+          "format": "string",
+          "default": "host",
+          "isRequired": false
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "GERRIT_BASE_URL",
+          "description": "Default Gerrit server URL (optional)",
+          "format": "string",
+          "isRequired": false,
+          "default": "https://gerrit-review.googlesource.com/"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://anonymous.modelcontextprotocol.io/gerrit-mcp-server",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json",
+          "description": "Content type for JSON requests"
+        }
+      ]
+    }
+  ]
+}
