@@ -20,7 +20,7 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 
 - Global configuration for registry base URL
 - Parameterized job input to select an MCP server from the registry
-- Free-form parameter input with a read-only preview of available servers (shortName -> fullName)
+- Free-form parameter input with a read-only preview of available servers (full names only)
 - Exposes selected values as environment variables: `$MCPX_SERVER_NAME` (from parameter), `$<PARAM_NAME>` (parameter name), and `$MCPX_SELECTED_SERVER` (from job-level selection)
 - mcpx-cli integration: configure CLI path
 - Job-level overrides: per-job CLI settings (path, registry URL)
@@ -56,10 +56,10 @@ Global (system) configuration example:
 
 5) Add a parameter to a job (recommended)
 - Configure job → This build is parameterized → Add parameter → “MCP Servers from MCPX Registry”
-- The parameter provides a textbox for the server value and a read-only preview list showing entries as `shortName -> fullName`.
+- The parameter provides a textbox for the server value and a read-only preview list showing entries as full identifiers.
 - Click “Refresh” to fetch the latest servers from the registry; if the preview doesn’t update immediately, reload the page. The plugin first tries the job’s labeled agent (Respect “Restrict where this project can be run”), then any online agent, and only as a last resort the controller.
 - Click “Probe” to see exactly where mcpx-cli ran (controller or which agent), which base URL and CLI path were used, and a snippet of the raw JSON output. Use this to diagnose missing preview data.
-- Paste or type the full server name into the textbox (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`). The shortName is just for display in the preview.
+- Paste or type the full server name into the textbox (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`).
 
 6) Use it in a build step
 
@@ -83,9 +83,7 @@ Jobs can override global CLI settings:
 2. Set any of:
   - CLI Path (e.g., a different version)
   - Registry Base URL (to use a different registry for this job)
-  - CLI Download URL (optional, required if using Update CLI)
   - Use the Test CLI button to verify the CLI works at the configured path
-  - Use the Update CLI button to download/install the CLI to the configured path (requires a download URL)
 
 Job configuration example:
 

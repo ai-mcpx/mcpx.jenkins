@@ -120,7 +120,7 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
                         list.append(opt.name).append(" -> ").append(opt.value);
                     }
                 }
-                String msg = "Refreshed MCP servers from registry (" + count + " items). If options didn't update, reload this page.";
+                String msg = "Refreshed MCP servers from registry (" + count + " items).";
                 if (count > 0) msg += "\n\n" + list.toString();
                 return FormValidation.ok(msg);
             } catch (Exception e) {
@@ -209,7 +209,8 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
                 for (hudson.util.ListBoxModel.Option o : model) {
                     if (o != null && o.value != null && !o.value.isEmpty()) {
                         if (sb.length() > 0) sb.append('\n');
-                        sb.append(o.name).append(" -> ").append(o.value);
+                        // Show only the full server identifier (value), without the display name
+                        sb.append(o.value);
                     }
                 }
                 if (sb.length() == 0) {

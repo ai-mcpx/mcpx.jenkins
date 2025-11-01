@@ -3,7 +3,7 @@
   <f:entry title="${it.name}" description="${it.description}">
     <f:textbox name="value"/>
   </f:entry>
-  <f:entry title="Available MCP Servers (read-only)">
+  <f:entry title="Available MCP Servers">
     <f:textarea value="${descriptor.getServersPreview()}" readonly="true"/>
   </f:entry>
   <f:entry>

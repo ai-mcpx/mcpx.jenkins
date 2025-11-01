@@ -19,14 +19,12 @@ import javax.annotation.Nonnull;
 public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
     private final String cliPath;
     private final String registryBaseUrl;
-    private final String cliDownloadUrl;
     private final String selectedServer;
 
     @DataBoundConstructor
-    public McpxJobProperty(String cliPath, String registryBaseUrl, String cliDownloadUrl, String selectedServer) {
+    public McpxJobProperty(String cliPath, String registryBaseUrl, String selectedServer) {
         this.cliPath = Util.fixEmptyAndTrim(cliPath);
         this.registryBaseUrl = Util.fixEmptyAndTrim(registryBaseUrl);
-        this.cliDownloadUrl = Util.fixEmptyAndTrim(cliDownloadUrl);
         this.selectedServer = Util.fixEmptyAndTrim(selectedServer);
     }
 
@@ -38,9 +36,7 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
         return registryBaseUrl;
     }
 
-    public String getCliDownloadUrl() {
-        return cliDownloadUrl;
-    }
+
 
     public String getSelectedServer() {
         return selectedServer != null ? selectedServer : "";
@@ -204,22 +200,6 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
             }
         }
 
-        @POST
-        public FormValidation doUpdateCli(@QueryParameter String cliPath, @QueryParameter String cliDownloadUrl) {
-            try {
-                String path = Util.fixEmptyAndTrim(cliPath);
-                String url = Util.fixEmptyAndTrim(cliDownloadUrl);
-                if (url == null || url.isEmpty()) {
-                    return FormValidation.error("CLI Download URL is required to update mcpx-cli.");
-                }
 
-                McpxCliInstaller installer = new McpxCliInstaller();
-                installer.downloadAndInstall(url, path, null, null);
-
-                return FormValidation.ok("mcpx-cli updated successfully!");
-            } catch (Exception e) {
-                return FormValidation.error("Failed to update mcpx-cli: " + e.getMessage());
-            }
-        }
     }
 }

@@ -10,14 +10,9 @@
     <f:entry title="Registry Base URL" field="registryBaseUrl" help="/plugin/mcpx-jenkins/help/job/registryBaseUrl.html">
       <f:textbox/>
     </f:entry>
-    <f:entry title="CLI Download URL" field="cliDownloadUrl" help="/plugin/mcpx-jenkins/help/job/cliDownloadUrl.html">
-      <f:textbox/>
-    </f:entry>
     <f:entry>
       <f:validateButton title="Test CLI" method="testCli" with="cliPath"/>
     </f:entry>
-    <f:entry>
-      <f:validateButton title="Update CLI" method="updateCli" with="cliPath,cliDownloadUrl"/>
-    </f:entry>
+
   </f:optionalBlock>
 </j:jelly>

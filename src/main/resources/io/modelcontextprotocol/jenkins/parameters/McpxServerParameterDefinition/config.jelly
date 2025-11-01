@@ -8,7 +8,7 @@
   <f:entry title="Default MCP Server (full name)" field="defaultServer" help="/plugin/mcpx-jenkins/help/param/defaultServer.html">
     <f:textbox/>
   </f:entry>
-  <f:entry title="Available MCP Servers (read-only)">
+  <f:entry title="Available MCP Servers">
     <f:textarea value="${descriptor.getServersPreview()}" readonly="true"/>
   </f:entry>
   <f:entry>
