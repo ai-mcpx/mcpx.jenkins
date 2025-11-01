@@ -117,7 +117,8 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
                     if (opt != null && opt.value != null && !opt.value.isEmpty()) {
                         count++;
                         if (list.length() > 0) list.append("\n");
-                        list.append(opt.name).append(" -> ").append(opt.value);
+                        // Show only the full identifier (value), consistent with the preview area
+                        list.append(opt.value);
                     }
                 }
                 String msg = "Refreshed MCP servers from registry (" + count + " items).";

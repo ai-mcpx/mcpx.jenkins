@@ -57,7 +57,7 @@ Global (system) configuration example:
 5) Add a parameter to a job (recommended)
 - Configure job → This build is parameterized → Add parameter → “MCP Servers from MCPX Registry”
 - The parameter provides a textbox for the server value and a read-only preview list showing entries as full identifiers.
-- Click “Refresh” to fetch the latest servers from the registry; if the preview doesn’t update immediately, reload the page. The plugin first tries the job’s labeled agent (Respect “Restrict where this project can be run”), then any online agent, and only as a last resort the controller.
+- Click “Refresh” to fetch the latest servers from the registry. The plugin first tries the job’s labeled agent (Respect “Restrict where this project can be run”), then any online agent, and only as a last resort the controller.
 - Click “Probe” to see exactly where mcpx-cli ran (controller or which agent), which base URL and CLI path were used, and a snippet of the raw JSON output. Use this to diagnose missing preview data.
 - Paste or type the full server name into the textbox (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`).
 
@@ -108,7 +108,7 @@ The parameter UI provides a “Probe” button that executes mcpx-cli on the nod
 
 Typical use:
 1) Click “Probe” to confirm mcpx-cli is installed at the path you configured on at least one candidate node
-2) If Probe succeeds on an agent, click “Refresh” and then reload the page to see the updated options
+2) If Probe succeeds on an agent, click “Refresh” to update the available options
 3) If Probe fails on all candidates, install mcpx-cli on the controller or configure your job to run on an agent that has mcpx-cli and set the job-level CLI Path accordingly
 
 ## Jenkinsfile example
@@ -208,7 +208,7 @@ mvn -ntp -Dspotbugs.skip package
     - Ensure mcpx-cli is installed on the controller or at least one online agent at the configured path
     - The plugin prefers the job’s labeled agent; if none are online, it tries any online agent, and only then the controller
     - Confirm Registry Base URL is set in Manage Jenkins → System → MCPX Registry
-    - Click “Probe” to see where it ran and what JSON the CLI returned; then reload the page and check again
+    - Click “Probe” to see where it ran and what JSON the CLI returned; then check again
     - Check Jenkins logs for lines starting with “Failed to fetch via mcpx-cli” for details
 
 - Probe failed: `Cannot run program "/var/jenkins_home/.local/bin/mcpx-cli": error=2`
