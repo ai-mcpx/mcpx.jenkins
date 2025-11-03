@@ -3,7 +3,12 @@
   "name": "io.modelcontextprotocol.anonymous/gerrit-mcp-server",
   "title": "Gerrit MCP Server",
   "description": "MCP server for Gerrit code review system based on GerritCodeReview/gerrit-mcp-server",
-  "websiteUrl": "https://github.com/ai-mcpx/gerrit-mcp-server/",
+  "websiteUrl": "https://anonymous.modelcontextprotocol.io/gerrit-mcp-server/",
+  "repository": {
+    "url": "https://github.com/ai-mcpx/gerrit-mcp-server",
+    "source": "github",
+    "id": "ai-mcpx/gerrit-mcp-server"
+  },
   "version": "1.0.0",
   "packages": [
     {
@@ -61,7 +66,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://anonymous.modelcontextprotocol.io/gerrit-mcp-server",
+      "url": "https://anonymous.modelcontextprotocol.io/gerrit-mcp-server/",
       "headers": [
         {
           "name": "Content-Type",
