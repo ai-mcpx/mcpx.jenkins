@@ -10,6 +10,11 @@
     <f:validateButton title="Refresh" method="refreshServers"/>
     <f:validateButton title="Probe" method="probeServers"/>
   </f:entry>
+  <f:entry>
+    <div style="color: #666; font-style: italic; margin-top: 5px;">
+      Note: If no servers are shown above but 'Refresh' reports success, please reload this page to see the updated server list.
+    </div>
+  </f:entry>
   <j:if test="${it.defaultServer != null && it.defaultServer != ''}">
     <f:entry>
       <div>Default: ${it.defaultServer}</div>
