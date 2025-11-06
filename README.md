@@ -163,7 +163,7 @@ Security and CSRF notes:
 
 ## Testing script: `test/jenkins/jenkins.sh`
 
-A simple testing script for triggering Jenkins jobs on Ubuntu using curl. This script demonstrates the basic workflow of triggering a parameterized build, polling the queue, and fetching build results.
+A simple testing script for triggering Jenkins jobs on Ubuntu using curl. This script demonstrates the basic workflow of triggering a parameterized build, polling the queue, fetching build results, and dumping the full console output after the job finishes.
 
 ### Configuration
 
@@ -173,7 +173,14 @@ Edit the script to set your Jenkins configuration:
 BASE_URL='http://<jenkins-host>:<port>'
 AUTH='USER:API_TOKEN'
 JOB_NAME='mcpx.jenkins'
+# Set to 'true' to enable DEBUG output, 'false' to disable
+DEBUG_ENABLED='true'
 ```
+
+- `BASE_URL`: Your Jenkins server URL
+- `AUTH`: Basic auth credentials in the format `USER:API_TOKEN`
+- `JOB_NAME`: The name of the Jenkins job to trigger
+- `DEBUG_ENABLED`: Set to `'true'` to enable verbose DEBUG output (default), or `'false'` to suppress all DEBUG messages for cleaner output
 
 ### Usage
 
@@ -184,6 +191,31 @@ chmod +x test/jenkins/jenkins.sh
 # Run the script
 ./test/jenkins/jenkins.sh
 ```
+
+### Output
+
+The script outputs a single merged JSON object containing both build metadata and console output:
+
+- **Build metadata**: `number`, `result`, `builtOn`, `fullDisplayName`, `timestamp`, `duration`, `queueId`
+- **Console output**: `consoleOutput` - full console log (only if the job has finished, otherwise empty string)
+
+The console output is automatically fetched and merged after the job completes. No streaming is performed; the entire console log is retrieved once the build finishes and merged into the JSON output for easy parsing.
+
+Example output format:
+```json
+{
+  "number": 39,
+  "result": "SUCCESS",
+  "builtOn": "mcpx.jenkins",
+  "fullDisplayName": "mcpx.jenkins #39",
+  "timestamp": 1762416127226,
+  "duration": 34,
+  "queueId": 38,
+  "consoleOutput": "Started by remote host...\nRunning as SYSTEM\n..."
+}
+```
+
+Note: If the job is still building or console output cannot be fetched, `consoleOutput` will be an empty string. DEBUG messages (if enabled) are sent to stderr, while the JSON output is sent to stdout.
 
 ### Prerequisites
 
