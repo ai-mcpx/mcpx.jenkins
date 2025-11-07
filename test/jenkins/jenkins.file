@@ -1,0 +1,18 @@
+properties([
+  parameters([
+    [$class: 'io.modelcontextprotocol.jenkins.parameters.McpxServerParameterDefinition', name: 'MCP_SERVER', description: 'Select an MCP server', defaultServer: '']
+  ])
+])
+
+pipeline {
+  agent any
+  stages {
+    stage('Show selection') {
+      steps {
+        echo "Selected via parameter name: ${env.MCP_SERVER}"
+        echo "Standardized param var: ${env.MCPX_SERVER_NAME}"
+        echo "Job-level selection: ${env.MCPX_SELECTED_SERVER}"
+      }
+    }
+  }
+}

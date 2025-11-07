@@ -1,10 +1,15 @@
 package io.modelcontextprotocol.jenkins;
 
+import hudson.model.Job;
 import hudson.util.ListBoxModel;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
 
+/**
+ * Tests for McpxRegistryClient.
+ * Note: fetchServers() now accepts Job instead of AbstractProject to support pipeline jobs.
+ */
 public class McpxRegistryClientTest {
     @Test
     public void parsesServersInObjectEnvelope() {

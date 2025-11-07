@@ -3,8 +3,10 @@ package io.modelcontextprotocol.jenkins;
 import hudson.Extension;
 import hudson.Util;
 import hudson.model.AbstractProject;
+import hudson.model.Job;
 import hudson.model.JobProperty;
 import hudson.model.JobPropertyDescriptor;
+import hudson.model.Label;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import net.sf.json.JSONObject;
@@ -16,7 +18,7 @@ import org.kohsuke.stapler.verb.POST;
 
 import javax.annotation.Nonnull;
 
-public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
+public class McpxJobProperty extends JobProperty<Job<?, ?>> {
     private final String cliPath;
     private final String registryBaseUrl;
     private final String selectedServer;
@@ -52,7 +54,7 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
 
         @Override
         public boolean isApplicable(Class jobType) {
-            return AbstractProject.class.isAssignableFrom(jobType);
+            return Job.class.isAssignableFrom(jobType);
         }
 
         @Override
@@ -64,21 +66,16 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
         }
 
         @POST
-        public FormValidation doTestCli(@AncestorInPath AbstractProject<?, ?> project, @QueryParameter String cliPath) {
+        public FormValidation doTestCli(@AncestorInPath Job<?, ?> job, @QueryParameter String cliPath) {
             try {
-                String path = Util.fixEmptyAndTrim(cliPath);
-                if (path == null) {
-                    // Fall back to global configuration if job-specific path not provided
-                    McpxGlobalConfiguration cfg = McpxGlobalConfiguration.get();
-                    String globalPath = (cfg != null) ? Util.fixEmptyAndTrim(cfg.getCliPath()) : null;
-                    path = (globalPath != null) ? globalPath : "mcpx-cli";
-                }
-
                 jenkins.model.Jenkins j = jenkins.model.Jenkins.get();
                 hudson.model.Node target = null;
+                String path = Util.fixEmptyAndTrim(cliPath);
 
-                if (project != null) {
-                    hudson.model.Label assigned = project.getAssignedLabel();
+                // Only try labeled agents for freestyle projects
+                if (job != null && job instanceof AbstractProject) {
+                    AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;
+                    Label assigned = project.getAssignedLabel();
                     if (assigned != null) {
                         for (hudson.model.Node n : assigned.getNodes()) {
                             if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
@@ -92,8 +89,16 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
                     }
                 }
 
+                // For pipeline jobs or freestyle jobs without labels, use controller
                 if (target == null) {
                     target = j; // fallback to controller
+                }
+
+                // If job-level path is not provided, use global configuration
+                if (path == null) {
+                    McpxGlobalConfiguration cfg = McpxGlobalConfiguration.get();
+                    String globalPath = (cfg != null) ? Util.fixEmptyAndTrim(cfg.getCliPath()) : null;
+                    path = (globalPath != null) ? globalPath : "mcpx-cli";
                 }
 
                 hudson.FilePath root = target.getRootPath();
@@ -110,10 +115,10 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
         }
 
         // Populate the job-level MCP Servers dropdown (workaround: select at job config)
-        public ListBoxModel doFillSelectedServerItems(@AncestorInPath AbstractProject<?, ?> project) {
+        public ListBoxModel doFillSelectedServerItems(@AncestorInPath Job<?, ?> job) {
             try {
-                if (project != null) {
-                    return new McpxRegistryClient().fetchServers(project);
+                if (job != null) {
+                    return new McpxRegistryClient().fetchServers(job);
                 }
                 return new McpxRegistryClient().fetchServers();
             } catch (Exception e) {
@@ -124,10 +129,10 @@ public class McpxJobProperty extends JobProperty<AbstractProject<?, ?>> {
         }
 
         @POST
-        public FormValidation doRefreshServers(@AncestorInPath AbstractProject<?, ?> project) {
+        public FormValidation doRefreshServers(@AncestorInPath Job<?, ?> job) {
             try {
-                hudson.util.ListBoxModel model = (project != null)
-                        ? new McpxRegistryClient().fetchServers(project)
+                hudson.util.ListBoxModel model = (job != null)
+                        ? new McpxRegistryClient().fetchServers(job)
                         : new McpxRegistryClient().fetchServers();
                 return FormValidation.ok("Refreshed MCP servers (" + model.size() + ")");
             } catch (Exception e) {

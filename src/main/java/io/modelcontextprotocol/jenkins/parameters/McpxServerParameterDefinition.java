@@ -1,6 +1,9 @@
 package io.modelcontextprotocol.jenkins.parameters;
 
 import hudson.Extension;
+import hudson.model.AbstractProject;
+import hudson.model.Job;
+import hudson.model.Label;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParameterValue;
 import hudson.model.SimpleParameterDefinition;
@@ -39,9 +42,9 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
         return defaultServer;
     }
 
-    public ListBoxModel doFillDefaultServerItems(@org.kohsuke.stapler.AncestorInPath hudson.model.AbstractProject<?, ?> project) {
-        if (project != null) {
-            return new McpxRegistryClient().fetchServers(project);
+    public ListBoxModel doFillDefaultServerItems(@org.kohsuke.stapler.AncestorInPath hudson.model.Job<?, ?> job) {
+        if (job != null) {
+            return new McpxRegistryClient().fetchServers(job);
         }
         return new McpxRegistryClient().fetchServers();
     }
@@ -69,15 +72,15 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
             return "MCP Servers from MCPX Registry";
         }
 
-        public ListBoxModel doFillValueItems(@org.kohsuke.stapler.AncestorInPath hudson.model.AbstractProject<?, ?> project, @QueryParameter String value) {
-            hudson.util.ListBoxModel model = (project != null)
-                    ? new McpxRegistryClient().fetchServers(project)
+        public ListBoxModel doFillValueItems(@org.kohsuke.stapler.AncestorInPath hudson.model.Job<?, ?> job, @QueryParameter String value) {
+            hudson.util.ListBoxModel model = (job != null)
+                    ? new McpxRegistryClient().fetchServers(job)
                     : new McpxRegistryClient().fetchServers();
             // Try to preselect the current or default value for clarity on the build page
             String sel = hudson.Util.fixEmptyAndTrim(value);
             if (sel == null || sel.isEmpty()) {
                 // If no current value, prefer the definition's default if present
-                if (project != null) {
+                if (job != null) {
                     // 'it' (definition) is not available here; we can't access defaultServer directly.
                     // As a heuristic, select the first non-empty option so the dropdown isn't visually empty.
                     for (hudson.util.ListBoxModel.Option o : model) {
@@ -105,11 +108,11 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
         }
 
         @POST
-        public FormValidation doRefreshServers(@org.kohsuke.stapler.AncestorInPath hudson.model.AbstractProject<?, ?> project) {
+        public FormValidation doRefreshServers(@org.kohsuke.stapler.AncestorInPath hudson.model.Job<?, ?> job) {
             try {
                 // Trigger a fresh fetch to validate availability; UI will repopulate on reload
-                hudson.util.ListBoxModel model = (project != null)
-                        ? new McpxRegistryClient().fetchServers(project)
+                hudson.util.ListBoxModel model = (job != null)
+                        ? new McpxRegistryClient().fetchServers(job)
                         : new McpxRegistryClient().fetchServers();
                 int count = 0;
                 StringBuilder list = new StringBuilder();
@@ -130,9 +133,9 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
         }
 
         @POST
-        public FormValidation doProbeServers(@org.kohsuke.stapler.AncestorInPath hudson.model.AbstractProject<?, ?> project) {
+        public FormValidation doProbeServers(@org.kohsuke.stapler.AncestorInPath hudson.model.Job<?, ?> job) {
             io.modelcontextprotocol.jenkins.McpxGlobalConfiguration cfg = io.modelcontextprotocol.jenkins.McpxGlobalConfiguration.get();
-            io.modelcontextprotocol.jenkins.McpxJobProperty jp = project != null ? project.getProperty(io.modelcontextprotocol.jenkins.McpxJobProperty.class) : null;
+            io.modelcontextprotocol.jenkins.McpxJobProperty jp = job != null ? job.getProperty(io.modelcontextprotocol.jenkins.McpxJobProperty.class) : null;
 
             String baseUrl = (jp != null && hudson.Util.fixEmptyAndTrim(jp.getRegistryBaseUrl()) != null)
                     ? hudson.Util.fixEmptyAndTrim(jp.getRegistryBaseUrl())
@@ -148,13 +151,18 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
             }
 
             // Build ordered candidate nodes: job's labeled nodes -> any online agents -> controller (last resort)
+            // Note: Only AbstractProject has getAssignedLabel(), pipeline jobs handle labels differently
             java.util.LinkedHashMap<hudson.model.Node, String> candidates = new java.util.LinkedHashMap<>();
             jenkins.model.Jenkins j = jenkins.model.Jenkins.get();
 
-            if (project != null && project.getAssignedLabel() != null) {
-                for (hudson.model.Node n : project.getAssignedLabel().getNodes()) {
-                    if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
-                        candidates.put(n, n.getNodeName());
+            if (job != null && job instanceof AbstractProject) {
+                AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;
+                Label assigned = project.getAssignedLabel();
+                if (assigned != null) {
+                    for (hudson.model.Node n : assigned.getNodes()) {
+                        if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
+                            candidates.put(n, n.getNodeName());
+                        }
                     }
                 }
             }
@@ -198,13 +206,13 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
         // Build a multi-line preview of available servers to display in the UI
         public String getServersPreview() {
             try {
-                hudson.model.AbstractProject<?, ?> project = null;
+                hudson.model.Job<?, ?> job = null;
                 org.kohsuke.stapler.StaplerRequest req = Stapler.getCurrentRequest();
                 if (req != null) {
-                    project = req.findAncestorObject(hudson.model.AbstractProject.class);
+                    job = req.findAncestorObject(hudson.model.Job.class);
                 }
-                hudson.util.ListBoxModel model = (project != null)
-                        ? new McpxRegistryClient().fetchServers(project)
+                hudson.util.ListBoxModel model = (job != null)
+                        ? new McpxRegistryClient().fetchServers(job)
                         : new McpxRegistryClient().fetchServers();
                 StringBuilder sb = new StringBuilder();
                 for (hudson.util.ListBoxModel.Option o : model) {

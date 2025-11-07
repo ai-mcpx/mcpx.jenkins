@@ -24,8 +24,9 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 - Free-form parameter input with a read-only preview of available servers (full names only)
 - Exposes selected values as environment variables: `$MCPX_SERVER_NAME` (from parameter), `$<PARAM_NAME>` (parameter name), and `$MCPX_SELECTED_SERVER` (from job-level selection)
 - mcpx-cli integration: configure CLI path
-- Job-level overrides: per-job CLI settings (path, registry URL)
+- Job-level overrides: per-job CLI settings (path, registry URL) - works with both freestyle projects and pipeline jobs
 - Diagnostics: one-click "Probe" button to test where mcpx-cli runs and preview raw JSON
+- Full support for both freestyle projects and pipeline jobs
 
 ## Quick Start
 
@@ -56,10 +57,10 @@ Global (system) configuration example:
 ![Global MCPX configuration](./global.png)
 
 5) Add a parameter to a job (recommended)
-- Configure job → This build is parameterized → Add parameter → “MCP Servers from MCPX Registry”
+- Configure job → This build is parameterized → Add parameter → "MCP Servers from MCPX Registry"
 - The parameter provides a textbox for the server value and a read-only preview list showing entries as full identifiers.
-- Click “Refresh” to fetch the latest servers from the registry. The plugin first tries the job’s labeled agent (Respect “Restrict where this project can be run”), then any online agent, and only as a last resort the controller.
-- Click “Probe” to see exactly where mcpx-cli ran (controller or which agent), which base URL and CLI path were used, and a snippet of the raw JSON output. Use this to diagnose missing preview data.
+- Click "Refresh" to fetch the latest servers from the registry. The plugin first tries the job's labeled agent (for freestyle projects: "Restrict where this project can be run"; for pipeline jobs: labels are handled differently), then any online agent, and only as a last resort the controller.
+- Click "Probe" to see exactly where mcpx-cli ran (controller or which agent), which base URL and CLI path were used, and a snippet of the raw JSON output. Use this to diagnose missing preview data.
 - Paste or type the full server name into the textbox (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`).
 
 6) Use it in a build step
@@ -79,7 +80,7 @@ mcpx-cli --base-url=<your-registry> servers --json
 
 ### Job-level overrides
 
-Jobs can override global CLI settings:
+Both freestyle projects and pipeline jobs can override global CLI settings:
 1. Configure job → check "MCPX Registry Plugin Configuration"
 2. Set any of:
   - CLI Path (e.g., a different version)
@@ -101,15 +102,17 @@ HTTP is intentionally not used to avoid CORS and environment-specific constraint
 
 ### Diagnostics: Probe
 
-The parameter UI provides a “Probe” button that executes mcpx-cli on the node selection the plugin uses (job’s labeled agent(s) → any online agent → controller) and returns a short message:
+The parameter UI provides a "Probe" button that executes mcpx-cli on the node selection the plugin uses (job's labeled agent(s) for freestyle projects → any online agent → controller) and returns a short message:
 
-- Where it ran: “controller” or the agent’s node name
+- Where it ran: "controller" or the agent's node name
 - Which base URL and CLI path were used
 - A short snippet of the raw JSON from `mcpx-cli servers --json`
 
+**Note:** For freestyle projects, the plugin respects the job's assigned label ("Restrict where this project can be run"). For pipeline jobs, label restrictions are handled differently by Jenkins, so the plugin will try any online agent before falling back to the controller.
+
 Typical use:
-1) Click “Probe” to confirm mcpx-cli is installed at the path you configured on at least one candidate node
-2) If Probe succeeds on an agent, click “Refresh” to update the available options
+1) Click "Probe" to confirm mcpx-cli is installed at the path you configured on at least one candidate node
+2) If Probe succeeds on an agent, click "Refresh" to update the available options
 3) If Probe fails on all candidates, install mcpx-cli on the controller or configure your job to run on an agent that has mcpx-cli and set the job-level CLI Path accordingly
 
 ## Jenkinsfile example
@@ -241,18 +244,20 @@ mvn -ntp -Dspotbugs.skip package
     - Ensure the path is correct on the target node (controller or labeled agent)
     - Absolute paths are recommended (e.g., `/usr/local/bin/mcpx-cli`); `~/` works and is expanded
     - If the job field is empty, the global CLI Path is used
+    - Works for both freestyle projects and pipeline jobs
 
 - No servers appear in the preview after clicking Refresh on the parameter
     - Ensure mcpx-cli is installed on the controller or at least one online agent at the configured path
-    - The plugin prefers the job’s labeled agent; if none are online, it tries any online agent, and only then the controller
+    - For freestyle projects: The plugin prefers the job's labeled agent; if none are online, it tries any online agent, and only then the controller
+    - For pipeline jobs: The plugin tries any online agent, then falls back to the controller (label restrictions are handled differently by Jenkins)
     - Confirm Registry Base URL is set in Manage Jenkins → System → MCPX Registry
-    - Click “Probe” to see where it ran and what JSON the CLI returned; then check again
-    - Check Jenkins logs for lines starting with “Failed to fetch via mcpx-cli” for details
+    - Click "Probe" to see where it ran and what JSON the CLI returned; then check again
+    - Check Jenkins logs for lines starting with "Failed to fetch via mcpx-cli" for details
 
 - Probe failed: `Cannot run program "/var/jenkins_home/.local/bin/mcpx-cli": error=2`
   - mcpx-cli is not installed at that path on the controller. Options:
-    - Install mcpx-cli on the controller at `/var/jenkins_home/.local/bin/mcpx-cli`, or update Global “CLI Path” to a valid controller path
-    - Alternatively, configure your job with a label to run on an agent where mcpx-cli is installed and set the job-level “CLI Path” to the agent’s absolute path (e.g., `/home/jenkins/.local/bin/mcpx-cli`). The plugin prefers the job’s labeled agent for Refresh/Probe when available
+    - Install mcpx-cli on the controller at `/var/jenkins_home/.local/bin/mcpx-cli`, or update Global "CLI Path" to a valid controller path
+    - Alternatively, configure your job with a label to run on an agent where mcpx-cli is installed and set the job-level "CLI Path" to the agent's absolute path (e.g., `/home/jenkins/.local/bin/mcpx-cli`). For freestyle projects, the plugin prefers the job's labeled agent for Refresh/Probe when available
 
 ## License
 

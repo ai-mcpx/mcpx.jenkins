@@ -3,6 +3,8 @@ package io.modelcontextprotocol.jenkins;
 import hudson.FilePath;
 import hudson.Util;
 import hudson.model.AbstractProject;
+import hudson.model.Job;
+import hudson.model.Label;
 import hudson.model.Node;
 import hudson.model.labels.LabelAtom;
 import hudson.util.ListBoxModel;
@@ -57,12 +59,12 @@ public class McpxRegistryClient {
         }
     }
 
-    public ListBoxModel fetchServers(AbstractProject<?, ?> project) {
+    public ListBoxModel fetchServers(Job<?, ?> job) {
         // Resolve effective settings: prefer job overrides, then global, then defaults
         String baseUrl;
         String cliPath;
         McpxGlobalConfiguration cfg = McpxGlobalConfiguration.get();
-        McpxJobProperty jp = project != null ? project.getProperty(McpxJobProperty.class) : null;
+        McpxJobProperty jp = job != null ? job.getProperty(McpxJobProperty.class) : null;
 
         if (jp != null && Util.fixEmptyAndTrim(jp.getRegistryBaseUrl()) != null) {
             baseUrl = Util.fixEmptyAndTrim(jp.getRegistryBaseUrl());
@@ -83,13 +85,18 @@ public class McpxRegistryClient {
         }
 
         // First, try an agent matching the job's assigned label (respect 'Restrict where this project can be run')
+        // Note: Only AbstractProject has getAssignedLabel(), pipeline jobs handle labels differently
         try {
             Node target = null;
-            if (project != null && project.getAssignedLabel() != null) {
-                for (Node n : project.getAssignedLabel().getNodes()) {
-                    if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
-                        target = n;
-                        break;
+            if (job != null && job instanceof AbstractProject) {
+                AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;
+                Label assigned = project.getAssignedLabel();
+                if (assigned != null) {
+                    for (Node n : assigned.getNodes()) {
+                        if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
+                            target = n;
+                            break;
+                        }
                     }
                 }
             }

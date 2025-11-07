@@ -1,7 +1,6 @@
 package io.modelcontextprotocol.jenkins;
 
 import hudson.Extension;
-import hudson.model.AbstractProject;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.model.TaskListener;
@@ -22,9 +21,8 @@ public class McpxRunListener extends RunListener<Run<?, ?>> {
     private void attachEnv(Run<?, ?> run) {
         if (run == null) return;
         Job<?, ?> job = run.getParent();
-        if (job instanceof AbstractProject) {
-            AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;
-            McpxJobProperty prop = project.getProperty(McpxJobProperty.class);
+        if (job != null) {
+            McpxJobProperty prop = job.getProperty(McpxJobProperty.class);
             if (prop != null) {
                 String selected = prop.getSelectedServer();
                 if (selected != null && !selected.trim().isEmpty()) {
