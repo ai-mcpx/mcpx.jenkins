@@ -24,8 +24,9 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
     @Override
     public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
         String value = jo.optString("value");
-        if (value == null || value.isEmpty()) {
-            value = defaultServer;
+        // Use defaultServer if value is null, empty, or only whitespace
+        if (value == null || value.trim().isEmpty()) {
+            value = (defaultServer != null) ? defaultServer : "";
         }
         return new McpxServerParameterValue(getName(), value);
     }
@@ -58,14 +59,15 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
 
     @Override
     public ParameterValue createValue(String value) {
-        if (value == null || value.isEmpty()) {
-            value = defaultServer;
+        // Use defaultServer if value is null, empty, or only whitespace
+        if (value == null || value.trim().isEmpty()) {
+            value = (defaultServer != null) ? defaultServer : "";
         }
         return new McpxServerParameterValue(getName(), value);
     }
 
     @Extension
-    public static class DescriptorImpl extends ParameterDescriptor {
+    public static class DescriptorImpl extends ParameterDefinition.ParameterDescriptor {
         @Nonnull
         @Override
         public String getDisplayName() {
@@ -73,36 +75,51 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
         }
 
         public ListBoxModel doFillValueItems(@org.kohsuke.stapler.AncestorInPath hudson.model.Job<?, ?> job, @QueryParameter String value) {
-            hudson.util.ListBoxModel model = (job != null)
-                    ? new McpxRegistryClient().fetchServers(job)
-                    : new McpxRegistryClient().fetchServers();
-            // Try to preselect the current or default value for clarity on the build page
-            String sel = hudson.Util.fixEmptyAndTrim(value);
-            if (sel == null || sel.isEmpty()) {
-                // If no current value, prefer the definition's default if present
-                if (job != null) {
-                    // 'it' (definition) is not available here; we can't access defaultServer directly.
+            hudson.util.ListBoxModel model = new hudson.util.ListBoxModel();
+            try {
+                model = (job != null)
+                        ? new McpxRegistryClient().fetchServers(job)
+                        : new McpxRegistryClient().fetchServers();
+                
+                // Ensure we have at least one option
+                if (model.isEmpty()) {
+                    model.add("(No servers available)", "");
+                }
+                
+                // Try to preselect the current or default value for clarity on the build page
+                String sel = hudson.Util.fixEmptyAndTrim(value);
+                if (sel == null || sel.isEmpty()) {
+                    // If no current value, prefer the definition's default if present
                     // As a heuristic, select the first non-empty option so the dropdown isn't visually empty.
                     for (hudson.util.ListBoxModel.Option o : model) {
                         if (o != null && o.value != null && !o.value.isEmpty()) { o.selected = true; break; }
                     }
                 } else {
+                    // Select the option matching the current value
+                    boolean matched = false;
                     for (hudson.util.ListBoxModel.Option o : model) {
-                        if (o != null && o.value != null && !o.value.isEmpty()) { o.selected = true; break; }
+                        if (o != null && sel.equals(o.value)) { o.selected = true; matched = true; break; }
+                    }
+                    // If no exact match found, fall back to first non-empty option
+                    if (!matched) {
+                        for (hudson.util.ListBoxModel.Option o : model) {
+                            if (o != null && o.value != null && !o.value.isEmpty()) { o.selected = true; break; }
+                        }
                     }
                 }
-            } else {
-                // Select the option matching the current value
-                boolean matched = false;
-                for (hudson.util.ListBoxModel.Option o : model) {
-                    if (o != null && sel.equals(o.value)) { o.selected = true; matched = true; break; }
+            } catch (Exception e) {
+                // Return error model instead of throwing exception to prevent page rendering failure
+                java.util.logging.Logger.getLogger(McpxServerParameterDefinition.class.getName())
+                    .log(java.util.logging.Level.WARNING, "Error populating MCP server dropdown", e);
+                String errorMsg = e.getMessage();
+                if (errorMsg == null || errorMsg.isEmpty()) {
+                    errorMsg = e.getClass().getSimpleName();
                 }
-                // If no exact match found, fall back to first non-empty option
-                if (!matched) {
-                    for (hudson.util.ListBoxModel.Option o : model) {
-                        if (o != null && o.value != null && !o.value.isEmpty()) { o.selected = true; break; }
-                    }
+                // Truncate long error messages
+                if (errorMsg.length() > 100) {
+                    errorMsg = errorMsg.substring(0, 97) + "...";
                 }
+                model.add("(Error: " + errorMsg + ")", "");
             }
             return model;
         }

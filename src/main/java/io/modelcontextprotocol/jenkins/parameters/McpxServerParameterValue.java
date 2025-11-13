@@ -22,9 +22,8 @@ public class McpxServerParameterValue extends ParameterValue {
     }
 
     public void buildEnvironment(@Nonnull Run<?, ?> build, @Nonnull EnvVars env) {
-        if (serverName != null) {
+        if (serverName != null && !serverName.trim().isEmpty()) {
             env.put(name, serverName);
-            env.put("MCPX_SERVER_NAME", serverName);
         }
     }
 

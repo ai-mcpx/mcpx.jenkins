@@ -5,13 +5,13 @@ properties([
 ])
 
 pipeline {
-  agent any
+  agent {
+    label 'mcpx.jenkins'
+  }
   stages {
     stage('Show selection') {
       steps {
-        echo "Selected via parameter name: ${env.MCP_SERVER}"
-        echo "Standardized param var: ${env.MCPX_SERVER_NAME}"
-        echo "Job-level selection: ${env.MCPX_SELECTED_SERVER}"
+        echo "Selected MCP server: ${env.MCP_SERVER}"
       }
     }
   }

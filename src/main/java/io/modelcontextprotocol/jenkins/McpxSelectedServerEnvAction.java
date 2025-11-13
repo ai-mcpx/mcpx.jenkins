@@ -16,9 +16,5 @@ public class McpxSelectedServerEnvAction extends InvisibleAction implements Envi
 
     @Override
     public void buildEnvironment(@Nonnull Run<?, ?> run, @Nonnull EnvVars env) {
-        if (selectedServer != null && !selectedServer.trim().isEmpty()) {
-            // Do not overwrite if already present
-            env.putIfAbsent("MCPX_SELECTED_SERVER", selectedServer);
-        }
     }
 }

@@ -21,8 +21,9 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 
 - Global configuration for registry base URL
 - Parameterized job input to select an MCP server from the registry
-- Free-form parameter input with a read-only preview of available servers (full names only)
-- Exposes selected values as environment variables: `$MCPX_SERVER_NAME` (from parameter), `$<PARAM_NAME>` (parameter name), and `$MCPX_SELECTED_SERVER` (from job-level selection)
+- Text input parameter with default value support from job configuration
+- Exposes selected value as environment variable: `$MCP_SERVER` (or your custom parameter name)
+- Default value from job configuration: Set "Default MCP Server" in parameter configuration to pre-fill the value
 - mcpx-cli integration: configure CLI path
 - Job-level overrides: per-job CLI settings (path, registry URL) - works with both freestyle projects and pipeline jobs
 - Diagnostics: one-click "Probe" button to test where mcpx-cli runs and preview raw JSON
@@ -58,10 +59,15 @@ Global (system) configuration example:
 
 5) Add a parameter to a job (recommended)
 - Configure job → This build is parameterized → Add parameter → "MCP Servers from MCPX Registry"
-- The parameter provides a textbox for the server value and a read-only preview list showing entries as full identifiers.
-- Click "Refresh" to fetch the latest servers from the registry. The plugin first tries the job's labeled agent (for freestyle projects: "Restrict where this project can be run"; for pipeline jobs: labels are handled differently), then any online agent, and only as a last resort the controller.
-- Click "Probe" to see exactly where mcpx-cli ran (controller or which agent), which base URL and CLI path were used, and a snippet of the raw JSON output. Use this to diagnose missing preview data.
-- Paste or type the full server name into the textbox (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`).
+- Set "Default MCP Server" (optional): Enter a default server value that will be pre-filled in "Build with Parameters"
+- The parameter configuration page shows:
+  - "Default MCP Server": The default value to use when building
+  - "Available MCP Servers": A read-only preview of servers from the registry
+  - "Refresh" button: Fetches the latest servers from the registry
+  - "Probe" button: Tests where mcpx-cli runs and shows raw JSON output
+- In "Build with Parameters", the text field will be pre-filled with the default value from configuration
+- If left empty, the default value from configuration will be used
+- Paste or type the full server name into the textbox (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`)
 
 6) Use it in a build step
 
@@ -102,20 +108,24 @@ HTTP is intentionally not used to avoid CORS and environment-specific constraint
 
 ### Diagnostics: Probe
 
-The parameter UI provides a "Probe" button that executes mcpx-cli on the node selection the plugin uses (job's labeled agent(s) for freestyle projects → any online agent → controller) and returns a short message:
+The parameter configuration page provides "Refresh" and "Probe" buttons:
 
-- Where it ran: "controller" or the agent's node name
-- Which base URL and CLI path were used
-- A short snippet of the raw JSON from `mcpx-cli servers --json`
+- **Refresh**: Fetches the latest servers from the registry and updates the "Available MCP Servers" preview
+- **Probe**: Executes mcpx-cli on the node selection the plugin uses (job's labeled agent(s) for freestyle projects → any online agent → controller) and returns a short message:
+  - Where it ran: "controller" or the agent's node name
+  - Which base URL and CLI path were used
+  - A short snippet of the raw JSON from `mcpx-cli servers --json`
 
 **Note:** For freestyle projects, the plugin respects the job's assigned label ("Restrict where this project can be run"). For pipeline jobs, label restrictions are handled differently by Jenkins, so the plugin will try any online agent before falling back to the controller.
 
 Typical use:
-1) Click "Probe" to confirm mcpx-cli is installed at the path you configured on at least one candidate node
-2) If Probe succeeds on an agent, click "Refresh" to update the available options
+1) Click "Probe" in the parameter configuration to confirm mcpx-cli is installed at the path you configured on at least one candidate node
+2) If Probe succeeds on an agent, click "Refresh" to update the available options preview
 3) If Probe fails on all candidates, install mcpx-cli on the controller or configure your job to run on an agent that has mcpx-cli and set the job-level CLI Path accordingly
 
 ## Jenkinsfile example
+
+### Basic example
 
 ```groovy
 properties([
@@ -129,14 +139,50 @@ pipeline {
   stages {
     stage('Show selection') {
       steps {
-        echo "Selected via parameter name: ${env.MCP_SERVER}"
-        echo "Standardized param var: ${env.MCPX_SERVER_NAME}"
-        echo "Job-level selection: ${env.MCPX_SELECTED_SERVER}"
+        echo "Selected MCP server: ${env.MCP_SERVER}"
       }
     }
   }
 }
 ```
+
+**Note:** The `defaultServer` parameter in the Jenkinsfile sets the default value. You can also set it in the job configuration UI under "Default MCP Server". If the user leaves the field empty in "Build with Parameters", the configured default value will be used.
+
+### Using labeled agents in pipeline jobs
+
+To run your pipeline job on a specific labeled agent (similar to "Restrict where this project can be run" in freestyle jobs), use the `agent` directive with a label:
+
+```groovy
+properties([
+  parameters([
+    [$class: 'io.modelcontextprotocol.jenkins.parameters.McpxServerParameterDefinition', name: 'MCP_SERVER', description: 'Select an MCP server', defaultServer: '']
+  ])
+])
+
+pipeline {
+  agent {
+    label 'your-agent-label'
+  }
+  stages {
+    stage('Show selection') {
+      steps {
+        echo "Selected MCP server: ${env.MCP_SERVER}"
+      }
+    }
+  }
+}
+```
+
+**Note:** When you use a labeled agent in your pipeline job:
+- The pipeline will run on an agent matching that label
+- The "Test CLI" button in job configuration will use the controller with the global CLI Path configuration (as pipeline jobs don't expose labels during configuration time)
+
+**Assigning labels to agents:**
+1. Navigate to **Manage Jenkins** > **Manage Nodes and Clouds**
+2. Click on the agent you wish to label
+3. Click **Configure**
+4. In the **Labels** field, enter the desired labels separated by spaces
+5. Click **Save**
 
 ## Trigger via Jenkins API
 
@@ -246,12 +292,12 @@ mvn -ntp -Dspotbugs.skip package
     - If the job field is empty, the global CLI Path is used
     - Works for both freestyle projects and pipeline jobs
 
-- No servers appear in the preview after clicking Refresh on the parameter
+- No servers appear in the preview after clicking Refresh in parameter configuration
     - Ensure mcpx-cli is installed on the controller or at least one online agent at the configured path
     - For freestyle projects: The plugin prefers the job's labeled agent; if none are online, it tries any online agent, and only then the controller
     - For pipeline jobs: The plugin tries any online agent, then falls back to the controller (label restrictions are handled differently by Jenkins)
     - Confirm Registry Base URL is set in Manage Jenkins → System → MCPX Registry
-    - Click "Probe" to see where it ran and what JSON the CLI returned; then check again
+    - Click "Probe" in parameter configuration to see where it ran and what JSON the CLI returned; then check again
     - Check Jenkins logs for lines starting with "Failed to fetch via mcpx-cli" for details
 
 - Probe failed: `Cannot run program "/var/jenkins_home/.local/bin/mcpx-cli": error=2`
