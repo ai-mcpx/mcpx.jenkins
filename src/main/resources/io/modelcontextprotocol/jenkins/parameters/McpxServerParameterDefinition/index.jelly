@@ -1,6 +1,9 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j='jelly:core' xmlns:f='/lib/form'>
-  <f:entry title="${it.name}" description="${it.description}">
-    <f:textbox name="value" value="${it.defaultServer != null ? it.defaultServer : ''}" />
-  </f:entry>
+  <div name="parameter">
+    <input type="hidden" name="name" value="${it.name}" />
+    <f:entry title="${it.name}" description="${it.description}">
+      <f:textbox name="value" value="${it.defaultServer != null ? it.defaultServer : ''}" />
+    </f:entry>
+  </div>
 </j:jelly>

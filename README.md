@@ -28,6 +28,7 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 - Job-level overrides: per-job CLI settings (path, registry URL) - works with both freestyle projects and pipeline jobs
 - Diagnostics: one-click "Probe" button to test where mcpx-cli runs and preview raw JSON
 - Full support for both freestyle projects and pipeline jobs
+- Full support for parameters defined in Jenkinsfiles using `properties([parameters([...])])`
 
 ## Quick Start
 
@@ -304,6 +305,12 @@ mvn -ntp -Dspotbugs.skip package
   - mcpx-cli is not installed at that path on the controller. Options:
     - Install mcpx-cli on the controller at `/var/jenkins_home/.local/bin/mcpx-cli`, or update Global "CLI Path" to a valid controller path
     - Alternatively, configure your job with a label to run on an agent where mcpx-cli is installed and set the job-level "CLI Path" to the agent's absolute path (e.g., `/home/jenkins/.local/bin/mcpx-cli`). For freestyle projects, the plugin prefers the job's labeled agent for Refresh/Probe when available
+
+- Parameter value is null or empty in pipeline execution
+    - Ensure the parameter is properly defined in the Jenkinsfile using the correct `$class` name
+    - Verify that the parameter value is being set in "Build with Parameters" or via API
+    - Check that the default value is configured if you want it to be used when the field is left empty
+    - The parameter now properly supports JSON deserialization for parameters defined in Jenkinsfiles
 
 ## License
 

@@ -18,17 +18,61 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.verb.POST;
 
 import javax.annotation.Nonnull;
+import java.util.logging.Logger;
 
 public class McpxServerParameterDefinition extends SimpleParameterDefinition {
+    private static final Logger LOGGER = Logger.getLogger(McpxServerParameterDefinition.class.getName());
 
+    static {
+        LOGGER.info("McpxServerParameterDefinition class loaded");
+    }
+
+    // Override to ensure we're called instead of parent class
     @Override
     public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
-        String value = jo.optString("value");
+        // Log that we're being called
+        LOGGER.severe("=== McpxServerParameterDefinition.createValue(StaplerRequest, JSONObject) CALLED ===");
+        LOGGER.info("McpxServerParameterDefinition.createValue(StaplerRequest, JSONObject) called - stack trace: " +
+            java.util.Arrays.toString(java.lang.Thread.currentThread().getStackTrace()).substring(0, Math.min(1000,
+            java.util.Arrays.toString(java.lang.Thread.currentThread().getStackTrace()).length())));
+        LOGGER.info("McpxServerParameterDefinition.createValue(StaplerRequest, JSONObject) called for parameter: " + getName());
+        String value = null;
+
+        // Try multiple sources for the parameter value
+        // 1. From JSON "value" key
+        if (jo != null && jo.has("value")) {
+            value = jo.optString("value", null);
+            LOGGER.info("Found value from JSON 'value' key: " + value);
+        }
+
+        // 2. From JSON using parameter name as key
+        if ((value == null || value.isEmpty()) && jo != null && jo.has(getName())) {
+            value = jo.optString(getName(), null);
+            LOGGER.info("Found value from JSON parameter name key: " + value);
+        }
+
+        // 3. From request parameter "value"
+        if ((value == null || value.isEmpty()) && req != null) {
+            value = req.getParameter("value");
+            LOGGER.info("Found value from request parameter 'value': " + value);
+        }
+
+        // 4. From request parameter using parameter name
+        if ((value == null || value.isEmpty()) && req != null) {
+            value = req.getParameter(getName());
+            LOGGER.info("Found value from request parameter '" + getName() + "': " + value);
+        }
+
         // Use defaultServer if value is null, empty, or only whitespace
         if (value == null || value.trim().isEmpty()) {
-            value = (defaultServer != null) ? defaultServer : "";
+            value = (defaultServer != null && !defaultServer.trim().isEmpty()) ? defaultServer : "";
+            LOGGER.info("Using defaultServer or empty string: " + value);
         }
-        return new McpxServerParameterValue(getName(), value);
+
+        LOGGER.info("Creating McpxServerParameterValue with name='" + getName() + "', value='" + value + "'");
+        McpxServerParameterValue paramValue = new McpxServerParameterValue(getName(), value);
+        LOGGER.info("Created parameter value: " + paramValue);
+        return paramValue;
     }
 
     private final String defaultServer;
@@ -37,6 +81,7 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
     public McpxServerParameterDefinition(String name, String description, String defaultServer) {
         super(name, description);
         this.defaultServer = defaultServer;
+        LOGGER.info("McpxServerParameterDefinition constructor called: name='" + name + "', description='" + description + "', defaultServer='" + defaultServer + "'");
     }
 
     public String getDefaultServer() {
@@ -52,22 +97,41 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
 
     @Override
     public ParameterValue getDefaultParameterValue() {
+        LOGGER.severe("=== McpxServerParameterDefinition.getDefaultParameterValue CALLED ===");
         String def = defaultServer != null ? defaultServer : "";
-        return new McpxServerParameterValue(getName(), def);
+        LOGGER.info("McpxServerParameterDefinition.getDefaultParameterValue called: name='" + getName() + "', default='" + def + "'");
+        LOGGER.info("getDefaultParameterValue stack trace: " + java.util.Arrays.toString(
+            java.lang.Thread.currentThread().getStackTrace()).substring(0, Math.min(1000,
+            java.util.Arrays.toString(java.lang.Thread.currentThread().getStackTrace()).length())));
+        McpxServerParameterValue paramValue = new McpxServerParameterValue(getName(), def);
+        LOGGER.info("getDefaultParameterValue returning: " + paramValue);
+        return paramValue;
     }
 
 
     @Override
     public ParameterValue createValue(String value) {
+        LOGGER.severe("=== McpxServerParameterDefinition.createValue(String) CALLED ===");
+        LOGGER.info("McpxServerParameterDefinition.createValue(String) called for parameter: " + getName() + ", input value: " + value);
         // Use defaultServer if value is null, empty, or only whitespace
+        // But preserve the original value if it's not empty (don't trim it)
         if (value == null || value.trim().isEmpty()) {
-            value = (defaultServer != null) ? defaultServer : "";
+            value = (defaultServer != null && !defaultServer.trim().isEmpty()) ? defaultServer : "";
+            LOGGER.info("Using defaultServer or empty string: " + value);
         }
-        return new McpxServerParameterValue(getName(), value);
+        LOGGER.info("Creating McpxServerParameterValue with name='" + getName() + "', value='" + value + "'");
+        McpxServerParameterValue paramValue = new McpxServerParameterValue(getName(), value);
+        LOGGER.info("Created parameter value: " + paramValue);
+        return paramValue;
     }
 
     @Extension
     public static class DescriptorImpl extends ParameterDefinition.ParameterDescriptor {
+        static {
+            java.util.logging.Logger.getLogger(McpxServerParameterDefinition.class.getName())
+                .info("McpxServerParameterDefinition.DescriptorImpl class loaded");
+        }
+
         @Nonnull
         @Override
         public String getDisplayName() {
@@ -80,12 +144,12 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
                 model = (job != null)
                         ? new McpxRegistryClient().fetchServers(job)
                         : new McpxRegistryClient().fetchServers();
-                
+
                 // Ensure we have at least one option
                 if (model.isEmpty()) {
                     model.add("(No servers available)", "");
                 }
-                
+
                 // Try to preselect the current or default value for clarity on the build page
                 String sel = hudson.Util.fixEmptyAndTrim(value);
                 if (sel == null || sel.isEmpty()) {
