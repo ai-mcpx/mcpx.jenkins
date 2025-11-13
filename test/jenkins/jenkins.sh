@@ -4,6 +4,7 @@
 BASE_URL='http://<jenkins-host>:<port>'
 AUTH='USER:API_TOKEN'
 JOB_NAME='mcpx.jenkins'
+MCP_SERVER='io.modelcontextprotocol.anonymous/gerrit-mcp-server'
 
 # Debug configuration
 DEBUG_ENABLED='false'
@@ -20,7 +21,10 @@ debug_echo() {
 
 # Trigger the job and capture Location header
 debug_echo "Triggering job: ${JOB_NAME}"
-headers=$(curl -sS --http1.1 -u "$AUTH" -H 'Connection: close' -D - -o /dev/null "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?MCP_SERVER=io.modelcontextprotocol.anonymous%2Fgerrit-mcp-server&token=mcpx.jenkins")
+# URL-encode MCP_SERVER value (encode / as %2F)
+MCP_SERVER_ENCODED=$(printf '%s\n' "$MCP_SERVER" | sed 's|/|%2F|g' | sed 's| |%20|g')
+debug_echo "MCP_SERVER parameter: ${MCP_SERVER} (encoded: ${MCP_SERVER_ENCODED})"
+headers=$(curl -sS --http1.1 -u "$AUTH" -H 'Connection: close' -D - -o /dev/null "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?MCP_SERVER=${MCP_SERVER_ENCODED}&token=mcpx.jenkins")
 QUEUED_URL=$(printf '%s\n' "$headers" | grep -i '^Location:' | tail -n 1 | cut -d' ' -f2- | tr -d '\r')
 debug_echo "Location header: ${QUEUED_URL}"
 

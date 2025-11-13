@@ -223,6 +223,7 @@ Edit the script to set your Jenkins configuration:
 BASE_URL='http://<jenkins-host>:<port>'
 AUTH='USER:API_TOKEN'
 JOB_NAME='mcpx.jenkins'
+MCP_SERVER='io.modelcontextprotocol.anonymous/gerrit-mcp-server'
 # Set to 'true' to enable DEBUG output, 'false' to disable
 DEBUG_ENABLED='true'
 ```
@@ -230,6 +231,7 @@ DEBUG_ENABLED='true'
 - `BASE_URL`: Your Jenkins server URL
 - `AUTH`: Basic auth credentials in the format `USER:API_TOKEN`
 - `JOB_NAME`: The name of the Jenkins job to trigger
+- `MCP_SERVER`: The MCP server identifier to pass as the `MCP_SERVER` parameter (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`). The script automatically URL-encodes this value (e.g., `/` becomes `%2F`) when making the API request.
 - `DEBUG_ENABLED`: Set to `'true'` to enable verbose DEBUG output (default), or `'false'` to suppress all DEBUG messages for cleaner output
 
 ### Usage
