@@ -213,6 +213,47 @@ public class McpxServerParameterDefinition extends SimpleParameterDefinition {
             }
         }
 
+        /**
+         * Gets parameter definitions extracted from packages for a given server.
+         * This helps users see what parameters are available to add to their job configuration.
+         */
+        @POST
+        public FormValidation doGetPackageParameters(@org.kohsuke.stapler.AncestorInPath hudson.model.Job<?, ?> job, @QueryParameter String serverName) {
+            if (serverName == null || serverName.trim().isEmpty()) {
+                return FormValidation.warning("No server selected");
+            }
+
+            try {
+                java.util.List<hudson.model.ParameterDefinition> params = io.modelcontextprotocol.jenkins.McpxPackageParameterExtractor.extractParameters(job, serverName);
+                if (params.isEmpty()) {
+                    return FormValidation.ok("No parameters found in packages for server: " + serverName);
+                }
+
+                StringBuilder sb = new StringBuilder("Found " + params.size() + " parameter(s) in packages:\n\n");
+                for (hudson.model.ParameterDefinition param : params) {
+                    String name = param.getName();
+                    String description = param.getDescription();
+                    String defaultValue = "";
+                    if (param instanceof hudson.model.StringParameterDefinition) {
+                        defaultValue = ((hudson.model.StringParameterDefinition) param).getDefaultValue();
+                    }
+                    sb.append("• ").append(name);
+                    if (description != null && !description.isEmpty()) {
+                        sb.append(": ").append(description);
+                    }
+                    if (defaultValue != null && !defaultValue.isEmpty()) {
+                        sb.append(" (default: ").append(defaultValue).append(")");
+                    }
+                    sb.append("\n");
+                }
+                sb.append("\nNote: Add these as String parameters in your job configuration to use them in 'Build with Parameters'.");
+                sb.append(" Default values will be automatically set when MCP_SERVER is configured.");
+                return FormValidation.ok(sb.toString());
+            } catch (Exception e) {
+                return FormValidation.error("Failed to get package parameters: " + e.getMessage());
+            }
+        }
+
         @POST
         public FormValidation doProbeServers(@org.kohsuke.stapler.AncestorInPath hudson.model.Job<?, ?> job) {
             io.modelcontextprotocol.jenkins.McpxGlobalConfiguration cfg = io.modelcontextprotocol.jenkins.McpxGlobalConfiguration.get();

@@ -1,6 +1,14 @@
 properties([
   parameters([
     [$class: 'io.modelcontextprotocol.jenkins.parameters.McpxServerParameterDefinition', name: 'MCP_SERVER', description: 'Select an MCP server', defaultServer: '']
+    // Package parameters are automatically available as environment variables when MCP_SERVER is set
+    // They are extracted from the server's packages configuration (registryType, runtimeArguments and environmentVariables)
+    // Examples based on common package structures:
+    // - Package metadata: MCPX_REGISTRY_TYPE (from registryType, e.g., docker, binary, npm, pypi, wheel)
+    // - Named runtime arguments: MCPX_PORT, MCPX_HOST, MCPX_CONFIG_PATH, MCPX_PORT_MAPPING (if valueHint is used)
+    // - Positional runtime arguments: MCPX_PORT_MAPPING, MCPX_VOLUME_MAPPING, etc.
+    // - Environment variables: MCPX_MCP_LOG_LEVEL, MCPX_MCP_DATA_DIR, MCPX_GERRIT_BASE_URL, etc.
+    // You can optionally add them as String parameters to allow overriding in "Build with Parameters"
   ])
 ])
 
@@ -9,9 +17,72 @@ pipeline {
     label 'mcpx.jenkins'
   }
   stages {
-    stage('Show selection') {
+    stage('Show MCP Server') {
       steps {
         echo "Selected MCP server: ${env.MCP_SERVER}"
+      }
+    }
+    stage('Show Package Parameters') {
+      steps {
+        script {
+          echo "=== Package Parameters from MCP Server ==="
+          echo "MCP_SERVER: ${env.MCP_SERVER ?: 'Not set'}"
+
+          // Runtime arguments (named) - examples from common package structures
+          if (env.MCPX_PORT) {
+            echo "MCPX_PORT: ${env.MCPX_PORT}"
+          }
+          if (env.MCPX_HOST) {
+            echo "MCPX_HOST: ${env.MCPX_HOST}"
+          }
+          if (env.MCPX_CONFIG_PATH) {
+            echo "MCPX_CONFIG_PATH: ${env.MCPX_CONFIG_PATH}"
+          }
+          if (env.MCPX_PORT_MAPPING) {
+            echo "MCPX_PORT_MAPPING: ${env.MCPX_PORT_MAPPING}"
+          }
+          if (env.MCPX_HOST_ADDRESS) {
+            echo "MCPX_HOST_ADDRESS: ${env.MCPX_HOST_ADDRESS}"
+          }
+          if (env.MCPX_PORT_NUMBER) {
+            echo "MCPX_PORT_NUMBER: ${env.MCPX_PORT_NUMBER}"
+          }
+
+          // Runtime arguments (positional)
+          if (env.MCPX_VOLUME_MAPPING) {
+            echo "MCPX_VOLUME_MAPPING: ${env.MCPX_VOLUME_MAPPING}"
+          }
+          if (env.MCPX_NETWORK_MODE) {
+            echo "MCPX_NETWORK_MODE: ${env.MCPX_NETWORK_MODE}"
+          }
+
+          // Environment variables
+          if (env.MCPX_MCP_LOG_LEVEL) {
+            echo "MCPX_MCP_LOG_LEVEL: ${env.MCPX_MCP_LOG_LEVEL}"
+          }
+          if (env.MCPX_MCP_DATA_DIR) {
+            echo "MCPX_MCP_DATA_DIR: ${env.MCPX_MCP_DATA_DIR}"
+          }
+          if (env.MCPX_MCP_HOST) {
+            echo "MCPX_MCP_HOST: ${env.MCPX_MCP_HOST}"
+          }
+          if (env.MCPX_MCP_PORT) {
+            echo "MCPX_MCP_PORT: ${env.MCPX_MCP_PORT}"
+          }
+          if (env.MCPX_GERRIT_BASE_URL) {
+            echo "MCPX_GERRIT_BASE_URL: ${env.MCPX_GERRIT_BASE_URL}"
+          }
+
+          // Package metadata
+          if (env.MCPX_REGISTRY_TYPE) {
+            echo "MCPX_REGISTRY_TYPE: ${env.MCPX_REGISTRY_TYPE}"
+          }
+
+          echo "=== All MCPX_* Environment Variables ==="
+          sh '''
+            env | grep "^MCPX_" | sort || echo "No MCPX_* environment variables found"
+          '''
+        }
       }
     }
   }

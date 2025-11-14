@@ -6,6 +6,17 @@ AUTH='USER:API_TOKEN'
 JOB_NAME='mcpx.jenkins'
 MCP_SERVER='io.modelcontextprotocol.anonymous/gerrit-mcp-server'
 
+# Package parameters (optional - these will be automatically set from packages if MCP_SERVER is configured)
+# You can override defaults by passing these parameters
+# Examples based on common package structures:
+# MCPX_REGISTRY_TYPE='docker'        # Package metadata: registryType (e.g., docker, binary, npm, pypi, wheel)
+# MCPX_PORT='8005'                   # Named runtime argument: --port
+# MCPX_HOST='0.0.0.0'                # Named runtime argument: --host
+# MCPX_PORT_MAPPING='8004:8000'      # Named runtime argument with valueHint: -p -> port_mapping
+# MCPX_MCP_LOG_LEVEL='DEBUG'         # Environment variable: MCP_LOG_LEVEL
+# MCPX_MCP_DATA_DIR='/custom/data'   # Environment variable: MCP_DATA_DIR
+# MCPX_GERRIT_BASE_URL='https://custom-gerrit.example.com/'  # Environment variable: GERRIT_BASE_URL
+
 # Debug configuration
 DEBUG_ENABLED='false'
 
@@ -24,7 +35,42 @@ debug_echo "Triggering job: ${JOB_NAME}"
 # URL-encode MCP_SERVER value (encode / as %2F)
 MCP_SERVER_ENCODED=$(printf '%s\n' "$MCP_SERVER" | sed 's|/|%2F|g' | sed 's| |%20|g')
 debug_echo "MCP_SERVER parameter: ${MCP_SERVER} (encoded: ${MCP_SERVER_ENCODED})"
-headers=$(curl -sS --http1.1 -u "$AUTH" -H 'Connection: close' -D - -o /dev/null "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?MCP_SERVER=${MCP_SERVER_ENCODED}&token=mcpx.jenkins")
+
+# Build parameter string with MCP_SERVER
+PARAMS="MCP_SERVER=${MCP_SERVER_ENCODED}"
+
+# Add package parameters if they are set (optional overrides)
+# These will override the defaults from the server's packages configuration
+if [[ -n "${MCPX_REGISTRY_TYPE:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_REGISTRY_TYPE=$(printf '%s\n' "$MCPX_REGISTRY_TYPE" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_REGISTRY_TYPE=${MCPX_REGISTRY_TYPE}"
+fi
+if [[ -n "${MCPX_PORT:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_PORT=$(printf '%s\n' "$MCPX_PORT" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_PORT=${MCPX_PORT}"
+fi
+if [[ -n "${MCPX_HOST:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_HOST=$(printf '%s\n' "$MCPX_HOST" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_HOST=${MCPX_HOST}"
+fi
+if [[ -n "${MCPX_PORT_MAPPING:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_PORT_MAPPING=$(printf '%s\n' "$MCPX_PORT_MAPPING" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_PORT_MAPPING=${MCPX_PORT_MAPPING}"
+fi
+if [[ -n "${MCPX_MCP_LOG_LEVEL:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_MCP_LOG_LEVEL=$(printf '%s\n' "$MCPX_MCP_LOG_LEVEL" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_MCP_LOG_LEVEL=${MCPX_MCP_LOG_LEVEL}"
+fi
+if [[ -n "${MCPX_MCP_DATA_DIR:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_MCP_DATA_DIR=$(printf '%s\n' "$MCPX_MCP_DATA_DIR" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_MCP_DATA_DIR=${MCPX_MCP_DATA_DIR}"
+fi
+if [[ -n "${MCPX_GERRIT_BASE_URL:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_GERRIT_BASE_URL=$(printf '%s\n' "$MCPX_GERRIT_BASE_URL" | sed 's|/|%2F|g' | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_GERRIT_BASE_URL=${MCPX_GERRIT_BASE_URL}"
+fi
+
+headers=$(curl -sS --http1.1 -u "$AUTH" -H 'Connection: close' -D - -o /dev/null "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?${PARAMS}&token=mcpx.jenkins")
 QUEUED_URL=$(printf '%s\n' "$headers" | grep -i '^Location:' | tail -n 1 | cut -d' ' -f2- | tr -d '\r')
 debug_echo "Location header: ${QUEUED_URL}"
 
@@ -308,7 +354,7 @@ if [[ "$result" != "BUILDING" && "$result" != "null" && -n "$result" ]]; then
       "${CONSOLE_URL}" 2>&1)
     console_curl_exit_code=$?
   fi
-  
+
   debug_echo "Console fetch completed. Exit code: ${console_curl_exit_code}"
   debug_echo "Console output length: ${#console_output}"
 

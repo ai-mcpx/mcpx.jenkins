@@ -247,6 +247,123 @@ public class McpxRegistryClient {
         }
     }
 
+    /**
+     * Fetches server details including packages information.
+     * @param job The job to use for configuration resolution
+     * @param serverName The server name to fetch details for
+     * @return JSON string containing server details with packages
+     */
+    public String fetchServerDetails(Job<?, ?> job, String serverName) throws IOException, InterruptedException {
+        if (serverName == null || serverName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Server name cannot be null or empty");
+        }
+
+        // Resolve effective settings: prefer job overrides, then global, then defaults
+        String baseUrl;
+        String cliPath;
+        McpxGlobalConfiguration cfg = McpxGlobalConfiguration.get();
+        McpxJobProperty jp = job != null ? job.getProperty(McpxJobProperty.class) : null;
+
+        if (jp != null && Util.fixEmptyAndTrim(jp.getRegistryBaseUrl()) != null) {
+            baseUrl = Util.fixEmptyAndTrim(jp.getRegistryBaseUrl());
+        } else {
+            baseUrl = (cfg != null && Util.fixEmptyAndTrim(cfg.getRegistryBaseUrl()) != null)
+                    ? Util.fixEmptyAndTrim(cfg.getRegistryBaseUrl())
+                    : "https://registry.modelcontextprotocol.io";
+        }
+
+        if (jp != null && Util.fixEmptyAndTrim(jp.getCliPath()) != null) {
+            cliPath = Util.fixEmptyAndTrim(jp.getCliPath());
+        } else {
+            cliPath = (cfg != null) ? cfg.getCliPath() : null;
+        }
+
+        if (Util.fixEmptyAndTrim(cliPath) == null) {
+            throw new IOException("mcpx-cli path not configured. Configure in Manage Jenkins > System > MCPX CLI or job overrides.");
+        }
+
+        // Try an agent matching the job's assigned label first
+        try {
+            Node target = null;
+            if (job != null && job instanceof AbstractProject) {
+                AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;
+                Label assigned = project.getAssignedLabel();
+                if (assigned != null) {
+                    for (Node n : assigned.getNodes()) {
+                        if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
+                            target = n;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (target != null) {
+                FilePath root = target.getRootPath();
+                if (root != null) {
+                    return root.act(new RemoteServerDetailsCallable(cliPath, baseUrl, serverName));
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Labeled agent fetch failed: " + e.getMessage(), e);
+        }
+
+        // Try any online agent
+        try {
+            Jenkins j = Jenkins.get();
+            for (Node n : j.getNodes()) {
+                if (n != null && n.toComputer() != null && n.toComputer().isOnline()) {
+                    FilePath root = n.getRootPath();
+                    if (root == null) continue;
+                    try {
+                        return root.act(new RemoteServerDetailsCallable(cliPath, baseUrl, serverName));
+                    } catch (Exception ex) {
+                        LOGGER.log(Level.FINE, "Agent " + n.getNodeName() + " fetch failed: " + ex.getMessage(), ex);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Any-agent fetch failed: " + e.getMessage(), e);
+        }
+
+        // Finally, try locally on controller
+        try {
+            McpxCliClient cliClient = new McpxCliClient(cliPath);
+            try { cliClient.login(baseUrl, "anonymous"); } catch (Exception ignore) {}
+            return cliClient.getServerDetails(baseUrl, serverName);
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Controller local fetch failed: " + e.getMessage(), e);
+            throw new IOException("Failed to fetch server details via mcpx-cli: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Parses server details JSON and extracts packages information.
+     * @param serverDetailsJson JSON string containing server details
+     * @return JSONObject containing the server details with packages
+     */
+    public JSONObject parseServerDetails(String serverDetailsJson) {
+        if (serverDetailsJson == null || serverDetailsJson.trim().isEmpty()) {
+            return new JSONObject();
+        }
+        try {
+            Object rootObj = net.sf.json.JSONSerializer.toJSON(serverDetailsJson);
+            if (rootObj instanceof JSONObject) {
+                return (JSONObject) rootObj;
+            } else if (rootObj instanceof JSONArray) {
+                JSONArray arr = (JSONArray) rootObj;
+                if (arr.size() > 0) {
+                    Object first = arr.get(0);
+                    if (first instanceof JSONObject) {
+                        return (JSONObject) first;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Failed to parse server details JSON", ex);
+        }
+        return new JSONObject();
+    }
+
     private ListBoxModel errorModel(String message) {
         LOGGER.log(Level.WARNING, "Registry fetch error: " + message);
         ListBoxModel m = new ListBoxModel();
@@ -295,6 +412,69 @@ public class McpxRegistryClient {
                     }
                 }
                 throw new IOException("mcpx-cli servers failed with exit code " + code + ": " + err.toString(StandardCharsets.UTF_8));
+            }
+            return out.toString(StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void checkRoles(org.jenkinsci.remoting.RoleChecker checker) throws SecurityException {
+            // default
+        }
+
+        private static String expandHome(String path) {
+            if (path != null && path.startsWith("~/")) {
+                String home = System.getProperty("user.home");
+                if (home != null && !home.isEmpty()) {
+                    return home + path.substring(1);
+                }
+            }
+            return path;
+        }
+    }
+
+    // Remote callable to fetch server details via mcpx-cli on an agent
+    private static class RemoteServerDetailsCallable implements FilePath.FileCallable<String> {
+        private final String rawCliPath;
+        private final String baseUrl;
+        private final String serverName;
+
+        RemoteServerDetailsCallable(String rawCliPath, String baseUrl, String serverName) {
+            this.rawCliPath = rawCliPath;
+            this.baseUrl = baseUrl;
+            this.serverName = serverName;
+        }
+
+        @Override
+        public String invoke(java.io.File f, hudson.remoting.VirtualChannel channel) throws IOException, InterruptedException {
+            String path = expandHome(rawCliPath);
+
+            // Login anonymous (best-effort)
+            ProcessBuilder loginPb = new ProcessBuilder(path, "--base-url=" + baseUrl, "login", "--method", "anonymous");
+            Process loginProc = loginPb.start();
+            int loginCode = loginProc.waitFor();
+            // Ignore non-zero login; we'll still attempt to get server details
+
+            // Get server details
+            ProcessBuilder pb = new ProcessBuilder(path, "--base-url=" + baseUrl, "server", serverName, "--json");
+            Process proc = pb.start();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    out.write((line + "\n").getBytes(StandardCharsets.UTF_8));
+                }
+            }
+            int code = proc.waitFor();
+            if (code != 0) {
+                // capture stderr for diagnostics
+                ByteArrayOutputStream err = new ByteArrayOutputStream();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getErrorStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        err.write((line + "\n").getBytes(StandardCharsets.UTF_8));
+                    }
+                }
+                throw new IOException("mcpx-cli server failed with exit code " + code + ": " + err.toString(StandardCharsets.UTF_8));
             }
             return out.toString(StandardCharsets.UTF_8);
         }

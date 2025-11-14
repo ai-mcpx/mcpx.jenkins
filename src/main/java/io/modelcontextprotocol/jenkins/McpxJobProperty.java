@@ -140,6 +140,45 @@ public class McpxJobProperty extends JobProperty<Job<?, ?>> {
             }
         }
 
+        /**
+         * Gets parameter definitions extracted from packages for a given server.
+         * This can be used to add parameters to the job configuration.
+         */
+        @POST
+        public hudson.util.ListBoxModel doGetPackageParameters(@AncestorInPath Job<?, ?> job, @QueryParameter String serverName) {
+            hudson.util.ListBoxModel model = new hudson.util.ListBoxModel();
+            if (serverName == null || serverName.trim().isEmpty()) {
+                model.add("(No server selected)", "");
+                return model;
+            }
+
+            try {
+                java.util.List<hudson.model.ParameterDefinition> params = McpxPackageParameterExtractor.extractParameters(job, serverName);
+                for (hudson.model.ParameterDefinition param : params) {
+                    String name = param.getName();
+                    String description = param.getDescription();
+                    String defaultValue = "";
+                    if (param instanceof hudson.model.StringParameterDefinition) {
+                        defaultValue = ((hudson.model.StringParameterDefinition) param).getDefaultValue();
+                    }
+                    String display = name;
+                    if (description != null && !description.isEmpty()) {
+                        display += " - " + description;
+                    }
+                    if (defaultValue != null && !defaultValue.isEmpty()) {
+                        display += " (default: " + defaultValue + ")";
+                    }
+                    model.add(display, name);
+                }
+                if (model.isEmpty()) {
+                    model.add("(No parameters found in packages)", "");
+                }
+            } catch (Exception e) {
+                model.add("(Error: " + e.getMessage() + ")", "");
+            }
+            return model;
+        }
+
         private static String expandTilde(String path) {
             if (path == null) return null;
             if (path.startsWith("~/")) {
