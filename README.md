@@ -461,7 +461,7 @@ DEBUG_ENABLED='true'
   - `MCPX_MCP_LOG_LEVEL`: Override logging level from `MCP_LOG_LEVEL` environment variable
   - `MCPX_MCP_DATA_DIR`: Override data directory from `MCP_DATA_DIR` environment variable
   - `MCPX_GERRIT_BASE_URL`: Override Gerrit URL from `GERRIT_BASE_URL` environment variable
-- `DEBUG_ENABLED`: Set to `'true'` to enable verbose DEBUG output (default), or `'false'` to suppress all DEBUG messages for cleaner output
+- `DEBUG_ENABLED`: Set to `'true'` to enable verbose DEBUG output, or `'false'` to suppress all DEBUG messages for cleaner output
 
 ### Usage
 
