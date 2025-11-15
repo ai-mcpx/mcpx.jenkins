@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
     python3-pip \
-    curl \
     git \
     ca-certificates \
     build-essential && \
@@ -44,12 +43,5 @@ RUN uv pip sync requirements.txt
 RUN uv pip install -e .
 RUN uv pip install build setuptools wheel
 
-# Expose port
-EXPOSE 6322
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:6322/health || exit 1
-
-# Default command
-CMD ["uvicorn", "gerrit_mcp_server.main:app", "--host", "0.0.0.0", "--port", "6322"]
+# Default command (STDIO mode)
+CMD ["python", "gerrit_mcp_server/main.py", "stdio"]

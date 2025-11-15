@@ -29,26 +29,10 @@
         },
         {
           "type": "positional",
-          "valueHint": "port_mapping",
-          "description": "Port mapping for the container",
-          "format": "string",
-          "default": "6322:6322",
-          "isRequired": true
-        },
-        {
-          "type": "positional",
           "valueHint": "volume_mapping",
           "description": "Volume mount for configuration access",
           "format": "string",
           "default": "${PWD}:/workspace",
-          "isRequired": false
-        },
-        {
-          "type": "positional",
-          "valueHint": "network_mode",
-          "description": "Network mode for Gerrit access",
-          "format": "string",
-          "default": "host",
           "isRequired": false
         }
       ],

@@ -157,25 +157,30 @@ When `MCP_SERVER` is set to this server:
 - `MCPX_PORT_MAPPING`: `8004:8000` (uses `valueHint` from `-p` argument)
 - `MCPX_PORT`: `8005` (uses `name` from `--port` argument)
 
-#### Example 2: Mixed Arguments and Environment Variables
+#### Example 2: STDIO Mode with Environment Variables
 
 ```json
 {
   "packages": [
     {
       "registryType": "docker",
+      "transport": {
+        "type": "stdio"
+      },
       "runtimeArguments": [
         {
           "type": "named",
-          "name": "--port",
-          "default": "8005",
-          "description": "Server port number"
+          "name": "--rm",
+          "description": "Remove container after exit",
+          "isRequired": true
         },
         {
           "type": "positional",
-          "valueHint": "port_mapping",
-          "default": "6322:6322",
-          "description": "Port mapping for the container"
+          "valueHint": "volume_mapping",
+          "description": "Volume mount for configuration access",
+          "format": "string",
+          "default": "${PWD}:/workspace",
+          "isRequired": false
         }
       ],
       "environmentVariables": [
@@ -199,8 +204,7 @@ When `MCP_SERVER` is set to this server, the following environment variables wil
 
 - `MCP_SERVER`: The selected server name
 - `MCPX_REGISTRY_TYPE`: `docker` (from `registryType` in the package)
-- `MCPX_PORT`: `8005` (default from `--port`)
-- `MCPX_PORT_MAPPING`: `6322:6322` (default from positional argument)
+- `MCPX_VOLUME_MAPPING`: `${PWD}:/workspace` (default from positional argument)
 - `MCPX_GERRIT_BASE_URL`: `https://gerrit-review.googlesource.com/` (default from environment variable)
 - `MCPX_MCP_LOG_LEVEL`: `INFO` (default from environment variable)
 
