@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
     python3-pip \
+    curl \
     git \
     ca-certificates \
     build-essential && \
@@ -32,16 +33,16 @@ ARG GERRIT_MCP_SERVER_REF=master
 RUN git clone --depth=1 --branch ${GERRIT_MCP_SERVER_REF} ${GERRIT_MCP_SERVER_REPO} .
 
 # Prepare virtual environment (uv-managed) so uv pip uses it
-RUN uv venv /opt/venv
+RUN /root/.local/bin/uv venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python build tooling and project dependencies (use uv within venv)
-RUN uv pip install -r uv-requirements.txt
-RUN uv pip compile pyproject.toml --generate-hashes --output-file requirements.txt --extra-index-url https://pypi.org/simple
-RUN uv pip sync requirements.txt
-RUN uv pip install -e .
-RUN uv pip install build setuptools wheel
+RUN /root/.local/bin/uv pip install -r uv-requirements.txt
+RUN /root/.local/bin/uv pip compile pyproject.toml --generate-hashes --output-file requirements.txt --extra-index-url https://pypi.org/simple
+RUN /root/.local/bin/uv pip sync requirements.txt
+RUN /root/.local/bin/uv pip install -e .
+RUN /root/.local/bin/uv pip install build setuptools wheel
 
 # Default command (STDIO mode)
 CMD ["python", "gerrit_mcp_server/main.py", "stdio"]
