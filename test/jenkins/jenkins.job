@@ -1,0 +1,458 @@
+#!/bin/bash
+set -uo pipefail
+# Note: We handle errors explicitly rather than using 'set -e' to ensure we can capture and display error messages
+
+# Jenkins Shell Job Script for MCP Server Execution
+# This script replaces the Pipeline script to avoid security issues
+# with Jenkins Pipeline script security sandbox
+
+echo "=== Jenkins MCP Server Job ==="
+echo ""
+
+# Stage 1: Show MCP Server
+echo "=== Stage: Show MCP Server ==="
+if [[ -n "${MCP_SERVER:-}" ]]; then
+  echo "Selected MCP server: ${MCP_SERVER}"
+else
+  echo "MCP_SERVER: Not set"
+fi
+echo ""
+
+# Stage 2: Show Package Parameters
+echo "=== Stage: Show Package Parameters ==="
+echo "MCP_SERVER: ${MCP_SERVER:-Not set}"
+echo ""
+
+# Runtime arguments (named) - examples from common package structures
+if [[ -n "${MCPX_PORT:-}" ]]; then
+  echo "MCPX_PORT: ${MCPX_PORT}"
+fi
+if [[ -n "${MCPX_HOST:-}" ]]; then
+  echo "MCPX_HOST: ${MCPX_HOST}"
+fi
+if [[ -n "${MCPX_CONFIG_PATH:-}" ]]; then
+  echo "MCPX_CONFIG_PATH: ${MCPX_CONFIG_PATH}"
+fi
+if [[ -n "${MCPX_PORT_MAPPING:-}" ]]; then
+  echo "MCPX_PORT_MAPPING: ${MCPX_PORT_MAPPING}"
+fi
+if [[ -n "${MCPX_HOST_ADDRESS:-}" ]]; then
+  echo "MCPX_HOST_ADDRESS: ${MCPX_HOST_ADDRESS}"
+fi
+if [[ -n "${MCPX_PORT_NUMBER:-}" ]]; then
+  echo "MCPX_PORT_NUMBER: ${MCPX_PORT_NUMBER}"
+fi
+
+# Runtime arguments (positional)
+if [[ -n "${MCPX_VOLUME_MAPPING:-}" ]]; then
+  echo "MCPX_VOLUME_MAPPING: ${MCPX_VOLUME_MAPPING}"
+fi
+if [[ -n "${MCPX_NETWORK_MODE:-}" ]]; then
+  echo "MCPX_NETWORK_MODE: ${MCPX_NETWORK_MODE}"
+fi
+
+# Environment variables
+if [[ -n "${MCPX_MCP_LOG_LEVEL:-}" ]]; then
+  echo "MCPX_MCP_LOG_LEVEL: ${MCPX_MCP_LOG_LEVEL}"
+fi
+if [[ -n "${MCPX_MCP_DATA_DIR:-}" ]]; then
+  echo "MCPX_MCP_DATA_DIR: ${MCPX_MCP_DATA_DIR}"
+fi
+if [[ -n "${MCPX_MCP_HOST:-}" ]]; then
+  echo "MCPX_MCP_HOST: ${MCPX_MCP_HOST}"
+fi
+if [[ -n "${MCPX_MCP_PORT:-}" ]]; then
+  echo "MCPX_MCP_PORT: ${MCPX_MCP_PORT}"
+fi
+if [[ -n "${MCPX_GERRIT_BASE_URL:-}" ]]; then
+  echo "MCPX_GERRIT_BASE_URL: ${MCPX_GERRIT_BASE_URL}"
+fi
+
+# Package metadata
+if [[ -n "${MCPX_REGISTRY_TYPE:-}" ]]; then
+  echo "MCPX_REGISTRY_TYPE: ${MCPX_REGISTRY_TYPE}"
+fi
+
+echo ""
+echo "=== All MCPX_* Environment Variables ==="
+env | grep "^MCPX_" | sort || echo "No MCPX_* environment variables found"
+echo ""
+
+# Stage 3: Run MCP Server
+if [[ -z "${MCP_SERVER:-}" ]]; then
+  echo "=== Stage: Run MCP Server ==="
+  echo "MCP_SERVER is not set, skipping server execution"
+  exit 0
+fi
+
+echo "=== Stage: Run MCP Server ==="
+echo "Running MCP server: ${MCP_SERVER}"
+
+# Get registry type
+REGISTRY_TYPE="${MCPX_REGISTRY_TYPE:-unknown}"
+echo "Registry type: ${REGISTRY_TYPE}"
+
+# Function to expand tilde in path
+expand_tilde() {
+  local path="$1"
+  # Check if path starts with ~ by checking first character
+  if [[ "${path:0:1}" == "~" ]]; then
+    # Get HOME directory
+    local home_dir="${HOME}"
+
+    if [[ -z "$home_dir" ]]; then
+      echo "ERROR: HOME environment variable is not set, cannot expand ~ in path: $path" >&2
+      echo "$path"  # Return original path
+      return 1
+    fi
+
+    # Handle different tilde patterns using string replacement
+    if [[ "$path" == "~" ]]; then
+      # Just ~
+      echo "$home_dir"
+    elif [[ "${path:0:2}" == "~/" ]]; then
+      # ~/something - replace ~/ with $HOME/
+      # Use substring to get everything after ~/
+      local rest="${path:2}"
+      echo "${home_dir}/${rest}"
+    else
+      # ~user or other patterns - we can't easily expand these, return as-is
+      # In practice, users should use absolute paths or ~/ paths
+      echo "$path"
+    fi
+  else
+    echo "$path"
+  fi
+}
+
+# Get CLI path
+# Priority: environment variable > default
+MCPX_CLI_PATH="${MCPX_CLI_PATH:-mcpx-cli}"
+if [[ -n "${MCPX_CLI_PATH:-}" ]]; then
+  # Expand tilde if present
+  MCPX_CLI_PATH=$(expand_tilde "${MCPX_CLI_PATH}")
+  echo "Using CLI path: ${MCPX_CLI_PATH}"
+else
+  MCPX_CLI_PATH="mcpx-cli"
+  echo "Using fallback CLI path: ${MCPX_CLI_PATH}"
+fi
+
+# Verify CLI path exists
+if [[ ! -f "${MCPX_CLI_PATH}" && "${MCPX_CLI_PATH}" != "mcpx-cli" ]]; then
+  echo "WARNING: CLI path does not exist: ${MCPX_CLI_PATH}"
+  echo "Will try to execute as command (may fail if not in PATH)"
+fi
+
+# Get base URL
+# Priority: environment variable > default
+BASE_URL="${MCPX_REGISTRY_BASE_URL:-https://mcpx.example.com}"
+if [[ -n "${MCPX_REGISTRY_BASE_URL:-}" ]]; then
+  echo "Using registry base URL from MCPX_REGISTRY_BASE_URL: ${BASE_URL}"
+else
+  echo "WARNING: Using default registry base URL: ${BASE_URL}"
+  echo "Note: Set MCPX_REGISTRY_BASE_URL environment variable in job configuration to use a custom registry"
+fi
+
+# Normalize base URL (remove trailing slash if present)
+BASE_URL="${BASE_URL%/}"
+
+echo "Using CLI path: ${MCPX_CLI_PATH}"
+echo "Using base URL: ${BASE_URL}"
+
+# Check if jq is available for JSON parsing
+if ! command -v jq &> /dev/null; then
+  echo "ERROR: jq is required for JSON parsing but is not installed"
+  echo "Please install jq: apt-get install jq (or yum install jq)"
+  exit 1
+fi
+
+# Fetch server details to get package information
+echo "Fetching server details..."
+echo "Command: ${MCPX_CLI_PATH} --base-url=\"${BASE_URL}\" server \"${MCP_SERVER}\" --json"
+
+# Execute command and capture both stdout and stderr
+# We capture the exit code explicitly since we're not using 'set -e'
+SERVER_JSON=$("${MCPX_CLI_PATH}" --base-url="${BASE_URL}" server "${MCP_SERVER}" --json 2>&1)
+CLI_EXIT_CODE=$?
+
+if [[ $CLI_EXIT_CODE -ne 0 ]]; then
+  echo "ERROR: Failed to fetch server details (exit code: ${CLI_EXIT_CODE})"
+  echo "Command that failed: ${MCPX_CLI_PATH} --base-url=\"${BASE_URL}\" server \"${MCP_SERVER}\" --json"
+  echo "Output:"
+  echo "${SERVER_JSON}"
+  exit 1
+fi
+
+# Check if we got valid JSON
+if [[ -z "${SERVER_JSON}" ]]; then
+  echo "ERROR: Received empty response from mcpx-cli"
+  exit 1
+fi
+
+if [[ "${SERVER_JSON}" == "null" ]]; then
+  echo "ERROR: Received null response from mcpx-cli"
+  exit 1
+fi
+
+# Validate JSON format
+if ! echo "${SERVER_JSON}" | jq empty 2>/dev/null; then
+  echo "ERROR: Invalid JSON response from mcpx-cli"
+  echo "Response (first 500 chars):"
+  echo "${SERVER_JSON:0:500}"
+  if [[ ${#SERVER_JSON} -gt 500 ]]; then
+    echo "... (truncated, total length: ${#SERVER_JSON} chars)"
+  fi
+  exit 1
+fi
+
+echo "Successfully fetched server details (response length: ${#SERVER_JSON} chars)"
+
+# Parse JSON to get package info
+echo "Parsing server configuration..."
+PACKAGE_INFO=""
+if [[ "$REGISTRY_TYPE" != "unknown" ]]; then
+  # Try to find package matching registry type
+  PACKAGE_INFO=$(echo "${SERVER_JSON}" | jq -c --arg rt "$REGISTRY_TYPE" '.packages[]? | select(.registryType == $rt)' 2>/dev/null | head -1)
+  if [[ -n "$PACKAGE_INFO" && "$PACKAGE_INFO" != "null" ]]; then
+    echo "Found package matching registry type: ${REGISTRY_TYPE}"
+  fi
+fi
+
+# If not found, use first package
+if [[ -z "$PACKAGE_INFO" || "$PACKAGE_INFO" == "null" ]]; then
+  echo "No package found for registry type ${REGISTRY_TYPE}, trying first available package..."
+  PACKAGE_INFO=$(echo "${SERVER_JSON}" | jq -c '.packages[0]? // empty' 2>/dev/null)
+fi
+
+if [[ -z "$PACKAGE_INFO" || "$PACKAGE_INFO" == "null" ]]; then
+  echo "ERROR: No package found in server configuration."
+  echo "Server JSON response:"
+  echo "${SERVER_JSON}" | jq '.' 2>/dev/null || echo "${SERVER_JSON}"
+  echo ""
+  echo "Expected registry type: ${REGISTRY_TYPE}"
+  echo "Available packages:"
+  echo "${SERVER_JSON}" | jq -r '.packages[]? | "  - \(.registryType): \(.identifier)"' 2>/dev/null || echo "  (unable to parse packages)"
+  exit 1
+fi
+
+# Extract package identifier and version
+PACKAGE_IDENTIFIER=$(echo "${PACKAGE_INFO}" | jq -r '.identifier // empty' 2>/dev/null)
+PACKAGE_VERSION=$(echo "${PACKAGE_INFO}" | jq -r '.version // empty' 2>/dev/null)
+
+if [[ -z "$PACKAGE_IDENTIFIER" || "$PACKAGE_IDENTIFIER" == "null" ]]; then
+  echo "ERROR: Package identifier is missing"
+  echo "Package info JSON:"
+  echo "${PACKAGE_INFO}" | jq '.' 2>/dev/null || echo "${PACKAGE_INFO}"
+  exit 1
+fi
+
+echo "Package identifier: ${PACKAGE_IDENTIFIER}"
+if [[ -n "$PACKAGE_VERSION" && "$PACKAGE_VERSION" != "null" ]]; then
+  echo "Package version: ${PACKAGE_VERSION}"
+fi
+
+# Build command based on registry type
+declare -a CMD_ARGS=()
+declare -a ENV_VARS=()
+
+# Extract environment variables from package config
+PACKAGE_ENV_VARS=$(echo "${PACKAGE_INFO}" | jq -c '.environmentVariables[]? // empty' 2>/dev/null)
+if [[ -n "$PACKAGE_ENV_VARS" ]]; then
+  while IFS= read -r env_var_json; do
+    if [[ -n "$env_var_json" && "$env_var_json" != "null" && "$env_var_json" != "" ]]; then
+      ENV_NAME=$(echo "$env_var_json" | jq -r '.name // empty' 2>/dev/null)
+      if [[ -n "$ENV_NAME" && "$ENV_NAME" != "null" ]]; then
+        MCPX_ENV_NAME="MCPX_${ENV_NAME}"
+        if [[ -n "${!MCPX_ENV_NAME:-}" ]]; then
+          ENV_VARS+=("${ENV_NAME}=${!MCPX_ENV_NAME}")
+        else
+          DEFAULT_VALUE=$(echo "$env_var_json" | jq -r '.default // empty' 2>/dev/null)
+          if [[ -n "$DEFAULT_VALUE" && "$DEFAULT_VALUE" != "null" ]]; then
+            ENV_VARS+=("${ENV_NAME}=${DEFAULT_VALUE}")
+          fi
+        fi
+      fi
+    fi
+  done <<< "$PACKAGE_ENV_VARS"
+fi
+
+# Build runtime arguments from package config and env vars
+RUNTIME_ARGS=$(echo "${PACKAGE_INFO}" | jq -c '.runtimeArguments[]? // empty' 2>/dev/null)
+declare -a NAMED_ARGS=()
+declare -a POSITIONAL_ARGS=()
+declare -a DOCKER_SPECIAL_ARGS=()
+
+if [[ -n "$RUNTIME_ARGS" ]]; then
+  while IFS= read -r arg_json; do
+    if [[ -n "$arg_json" && "$arg_json" != "null" && "$arg_json" != "" ]]; then
+      ARG_TYPE=$(echo "$arg_json" | jq -r '.type // empty')
+      ARG_NAME=$(echo "$arg_json" | jq -r '.name // empty')
+      ARG_VALUE_HINT=$(echo "$arg_json" | jq -r '.valueHint // empty')
+      ARG_DEFAULT=$(echo "$arg_json" | jq -r '.default // empty')
+      ARG_IS_REQUIRED=$(echo "$arg_json" | jq -r '.isRequired // false')
+
+      if [[ "$ARG_TYPE" == "named" ]]; then
+        ARG_VALUE=""
+        if [[ -n "$ARG_VALUE_HINT" && "$ARG_VALUE_HINT" != "null" ]]; then
+          ENV_KEY="MCPX_$(echo "$ARG_VALUE_HINT" | tr '[:lower:]' '[:upper:]' | tr '-' '_')"
+          ARG_VALUE="${!ENV_KEY:-}"
+        else
+          # Use argument name without leading dashes
+          ARG_NAME_CLEAN=$(echo "$ARG_NAME" | sed 's/^--*//' | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          ENV_KEY="MCPX_${ARG_NAME_CLEAN}"
+          ARG_VALUE="${!ENV_KEY:-}"
+        fi
+
+        if [[ -z "$ARG_VALUE" && -n "$ARG_DEFAULT" && "$ARG_DEFAULT" != "null" ]]; then
+          ARG_VALUE="$ARG_DEFAULT"
+        fi
+
+        # For flags without values (like --rm), just check if they should be included
+        if [[ "$ARG_IS_REQUIRED" == "true" && -z "$ARG_VALUE_HINT" && "$ARG_NAME" == "--rm" ]]; then
+          NAMED_ARGS+=("--rm")
+        elif [[ -n "$ARG_VALUE" ]]; then
+          NAMED_ARGS+=("${ARG_NAME}")
+          NAMED_ARGS+=("${ARG_VALUE}")
+        fi
+      elif [[ "$ARG_TYPE" == "positional" ]]; then
+        if [[ -n "$ARG_VALUE_HINT" && "$ARG_VALUE_HINT" != "null" ]]; then
+          ENV_KEY="MCPX_$(echo "$ARG_VALUE_HINT" | tr '[:lower:]' '[:upper:]' | tr '-' '_')"
+          VALUE="${!ENV_KEY:-}"
+          if [[ -z "$VALUE" && -n "$ARG_DEFAULT" && "$ARG_DEFAULT" != "null" ]]; then
+            VALUE="$ARG_DEFAULT"
+          fi
+
+          if [[ -n "$VALUE" ]]; then
+            # For docker, some positional args map to docker flags
+            if [[ "$REGISTRY_TYPE" == "docker" ]]; then
+              if [[ "$ARG_VALUE_HINT" == "port_mapping" ]]; then
+                DOCKER_SPECIAL_ARGS+=("-p")
+                DOCKER_SPECIAL_ARGS+=("${VALUE}")
+              elif [[ "$ARG_VALUE_HINT" == "volume_mapping" ]]; then
+                DOCKER_SPECIAL_ARGS+=("-v")
+                DOCKER_SPECIAL_ARGS+=("${VALUE}")
+              elif [[ "$ARG_VALUE_HINT" == "network_mode" ]]; then
+                DOCKER_SPECIAL_ARGS+=("--network")
+                DOCKER_SPECIAL_ARGS+=("${VALUE}")
+              else
+                POSITIONAL_ARGS+=("${VALUE}")
+              fi
+            else
+              POSITIONAL_ARGS+=("${VALUE}")
+            fi
+          fi
+        fi
+      fi
+    fi
+  done <<< "$RUNTIME_ARGS"
+fi
+
+# Build command based on registry type
+case "$REGISTRY_TYPE" in
+  docker)
+    CMD_ARGS=("docker" "run")
+
+    # Add named arguments
+    for i in "${!NAMED_ARGS[@]}"; do
+      CMD_ARGS+=("${NAMED_ARGS[$i]}")
+    done
+
+    # Add docker-specific special args (from positional with valueHint)
+    for i in "${!DOCKER_SPECIAL_ARGS[@]}"; do
+      CMD_ARGS+=("${DOCKER_SPECIAL_ARGS[$i]}")
+    done
+
+    # Add environment variables
+    for env_var in "${ENV_VARS[@]}"; do
+      CMD_ARGS+=("-e" "${env_var}")
+    done
+
+    # Add image identifier
+    IMAGE_TAG="${PACKAGE_IDENTIFIER}"
+    if [[ -n "$PACKAGE_VERSION" && "$PACKAGE_VERSION" != "null" ]]; then
+      IMAGE_TAG="${PACKAGE_IDENTIFIER}:${PACKAGE_VERSION}"
+    fi
+    CMD_ARGS+=("${IMAGE_TAG}")
+
+    # Add remaining positional arguments (after image name)
+    for pos_arg in "${POSITIONAL_ARGS[@]}"; do
+      CMD_ARGS+=("${pos_arg}")
+    done
+    ;;
+
+  binary)
+    # Binary execution
+    CMD_ARGS=("${PACKAGE_IDENTIFIER}")
+
+    # Add named arguments
+    for i in "${!NAMED_ARGS[@]}"; do
+      CMD_ARGS+=("${NAMED_ARGS[$i]}")
+    done
+
+    # Add positional arguments
+    for pos_arg in "${POSITIONAL_ARGS[@]}"; do
+      CMD_ARGS+=("${pos_arg}")
+    done
+    ;;
+
+  npm)
+    # npm/npx execution
+    CMD_ARGS=("npx" "${PACKAGE_IDENTIFIER}")
+
+    # Add named arguments
+    for i in "${!NAMED_ARGS[@]}"; do
+      CMD_ARGS+=("${NAMED_ARGS[$i]}")
+    done
+
+    # Add positional arguments
+    for pos_arg in "${POSITIONAL_ARGS[@]}"; do
+      CMD_ARGS+=("${pos_arg}")
+    done
+    ;;
+
+  pypi|wheel)
+    # Python execution
+    if [[ "$REGISTRY_TYPE" == "pypi" ]]; then
+      CMD_ARGS=("python" "-m" "${PACKAGE_IDENTIFIER}")
+    else
+      # For wheel, extract module name from identifier
+      MODULE_NAME="${PACKAGE_IDENTIFIER}"
+      if [[ "$MODULE_NAME" == *"/"* ]]; then
+        MODULE_NAME="${MODULE_NAME##*/}"
+      fi
+      MODULE_NAME=$(echo "$MODULE_NAME" | sed 's/\.whl$//' | sed 's/-.*$//')
+      CMD_ARGS=("python" "-m" "${MODULE_NAME}")
+    fi
+
+    # Add named arguments
+    for i in "${!NAMED_ARGS[@]}"; do
+      CMD_ARGS+=("${NAMED_ARGS[$i]}")
+    done
+
+    # Add positional arguments
+    for pos_arg in "${POSITIONAL_ARGS[@]}"; do
+      CMD_ARGS+=("${pos_arg}")
+    done
+    ;;
+
+  *)
+    echo "ERROR: Unsupported registry type: ${REGISTRY_TYPE}"
+    exit 1
+    ;;
+esac
+
+# Display command
+echo "Executing command: ${CMD_ARGS[*]}"
+if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
+  echo "Environment variables: ${ENV_VARS[*]}"
+fi
+echo ""
+
+# Execute command with environment variables
+# Export environment variables first
+for env_var in "${ENV_VARS[@]}"; do
+  export "${env_var}"
+done
+
+# Execute the command (don't use exec so Jenkins can capture the exit code)
+"${CMD_ARGS[@]}"

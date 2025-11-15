@@ -11,7 +11,8 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
   - [Job-level overrides](#job-level-overrides)
   - [Why CLI instead of HTTP?](#why-cli-instead-of-http)
   - [Diagnostics: Probe](#diagnostics-probe)
-- [Jenkinsfile example](#jenkinsfile-example)
+- [Running MCP Servers in Jenkins](#running-mcp-servers-in-jenkins)
+  - [Using Bash Script (Recommended for Shell Jobs)](#using-bash-script-recommended-for-shell-jobs)
   - [Running MCP Servers in Pipeline](#running-mcp-servers-in-pipeline)
 - [Trigger via Jenkins API](#trigger-via-jenkins-api)
 - [Testing script: `test/jenkins/jenkins.sh`](#testing-script-testjenkinsjenkinssh)
@@ -31,7 +32,6 @@ A Jenkins plugin that adds a build parameter to list MCP servers from an MCPX Re
 - Job-level overrides: per-job CLI settings (path, registry URL) - works with both freestyle projects and pipeline jobs
 - Diagnostics: one-click "Probe" button to test where mcpx-cli runs and preview raw JSON
 - Full support for both freestyle projects and pipeline jobs
-- Full support for parameters defined in Jenkinsfiles using `properties([parameters([...])])`
 
 ## Quick Start
 
@@ -51,9 +51,9 @@ The resulting `.hpi` will be under `target/`.
 
 4) Configure mcpx-cli
 - Manage Jenkins → System → MCPX CLI:
-  - CLI Path: absolute path to mcpx-cli (e.g., `/home/jenkins/.local/bin/mcpx-cli` or `/usr/local/bin/mcpx-cli`)
+  - CLI Path: path to mcpx-cli (e.g., `/home/jenkins/.local/bin/mcpx-cli`, `/usr/local/bin/mcpx-cli`, or `~/.local/bin/mcpx-cli`)
   - Notes:
-    - Use absolute paths (e.g., `/home/jenkins/.local/bin/mcpx-cli`) instead of paths with `~` (e.g., `~/.local/bin/mcpx-cli`)
+    - You can use absolute paths or paths with `~` (tilde) - the bash script will automatically expand `~` to the user's home directory
     - If a job leaves its CLI Path empty, the global CLI Path is used by Test CLI
     - Ensure the configured path exists on the controller and/or any agents that will run refresh operations
 
@@ -79,9 +79,10 @@ Global (system) configuration example:
 
 When `MCP_SERVER` is configured (either in job configuration or via "Build with Parameters"), the plugin automatically:
 
-1. Queries the server details using mcpx-cli to fetch the `packages` configuration
-2. Extracts parameters from the first package's `registryType`, `runtimeArguments`, and `environmentVariables`
-3. Sets them as environment variables with default values from the package definition
+1. Sets `MCPX_REGISTRY_BASE_URL` as an environment variable from the configured registry base URL (job-level > global > default)
+2. Queries the server details using mcpx-cli to fetch the `packages` configuration
+3. Extracts parameters from the first package's `registryType`, `runtimeArguments`, and `environmentVariables`
+4. Sets them as environment variables with default values from the package definition
 
 ### Parameter Naming
 
@@ -278,310 +279,81 @@ Typical use:
 2) If Probe succeeds on an agent, click "Refresh" to update the available options preview
 3) If Probe fails on all candidates, install mcpx-cli on the controller or configure your job to run on an agent that has mcpx-cli and set the job-level CLI Path accordingly
 
-## Jenkinsfile example
+## Running MCP Servers in Jenkins
 
-### Basic example
+### Using Bash Script (Recommended for Shell Jobs)
 
-```groovy
-properties([
-  parameters([
-    [$class: 'io.modelcontextprotocol.jenkins.parameters.McpxServerParameterDefinition', name: 'MCP_SERVER', description: 'Select an MCP server', defaultServer: '']
-  ])
-])
+For **Freestyle projects** (shell jobs), use the bash script `test/jenkins/jenkins.job` to avoid Pipeline script security sandbox issues. This script:
 
-pipeline {
-  agent any
-  stages {
-    stage('Show selection') {
-      steps {
-        echo "Selected MCP server: ${env.MCP_SERVER}"
-      }
-    }
-  }
-}
-```
+- Runs as a standard shell script (no Pipeline security restrictions)
+- Uses environment variables provided by Jenkins
+- Fetches server details using `mcpx-cli`
+- Parses package configuration from JSON
+- Builds and executes commands dynamically based on registry type
 
-**Note:** The `defaultServer` parameter in the Jenkinsfile sets the default value. You can also set it in the job configuration UI under "Default MCP Server". If the user leaves the field empty in "Build with Parameters", the configured default value will be used.
+**Setup:**
 
-### Example with Package Parameters
+1. Create a **Freestyle project** (not a Pipeline job)
+2. Add the MCP Server parameter (configured via the Jenkins plugin)
+3. In the "Build" section, add an "Execute shell" build step
+4. Paste the contents of `test/jenkins/jenkins.job` or reference it as a script file
+5. Ensure `jq` is installed on the Jenkins agent (`apt-get install jq` or `yum install jq`)
 
-The test file `test/jenkins/jenkins.file` demonstrates how to use package parameters that are automatically extracted from the MCP server's packages configuration:
+**Prerequisites:**
 
-```groovy
-properties([
-  parameters([
-    [$class: 'io.modelcontextprotocol.jenkins.parameters.McpxServerParameterDefinition', name: 'MCP_SERVER', description: 'Select an MCP server', defaultServer: '']
-    // Package parameters are automatically available as environment variables when MCP_SERVER is set
-  ])
-])
+- `jq` must be installed on the Jenkins agent for JSON parsing
+- `mcpx-cli` must be available (configured via plugin settings)
+- Environment variables are automatically set by the plugin:
+  - `MCP_SERVER`: Selected server name
+  - `MCPX_CLI_PATH`: CLI path from configuration (job-level > global > default), with `~` automatically expanded
+  - `MCPX_REGISTRY_BASE_URL`: Registry base URL from configuration (job-level > global > default)
+  - `MCPX_*`: Package parameters extracted from server configuration
 
-pipeline {
-  agent {
-    label 'mcpx.jenkins'
-  }
-  stages {
-    stage('Show Package Parameters') {
-      steps {
-        script {
-          echo "MCP_SERVER: ${env.MCP_SERVER ?: 'Not set'}"
+**The script performs three stages:**
 
-          // Package metadata
-          if (env.MCPX_REGISTRY_TYPE) {
-            echo "MCPX_REGISTRY_TYPE: ${env.MCPX_REGISTRY_TYPE}"
-          }
-
-          // Package parameters are automatically available
-          if (env.MCPX_PORT) {
-            echo "MCPX_PORT: ${env.MCPX_PORT}"
-          }
-          if (env.MCPX_PORT_MAPPING) {
-            echo "MCPX_PORT_MAPPING: ${env.MCPX_PORT_MAPPING}"
-          }
-          if (env.MCPX_MCP_LOG_LEVEL) {
-            echo "MCPX_MCP_LOG_LEVEL: ${env.MCPX_MCP_LOG_LEVEL}"
-          }
-
-          // Show all MCPX_* environment variables
-          sh 'env | grep "^MCPX_" | sort || echo "No MCPX_* environment variables found"'
-        }
-      }
-    }
-  }
-}
-```
-
-When `MCP_SERVER` is set, package parameters are automatically injected as environment variables with their default values from the server's packages configuration. You can access them directly in your pipeline steps.
-
-### Running MCP Servers in Pipeline
-
-The test file `test/jenkins/jenkins.file` includes a "Run MCP Server" stage that executes MCP servers based on the selected server and its package configuration. This stage:
-
-1. Retrieves CLI path and base URL from Jenkins plugin configuration with the following priority:
-
-   **CLI Path Priority:**
-   - **MCPX_CLI_PATH environment variable** (works even if script security blocks configuration access)
-   - **Job-level configuration** (overrides global, but may be blocked by script security sandbox)
-   - **Global configuration** (used if job-level is not set, but may be blocked by script security sandbox)
-   - **Default value**: `mcpx-cli` (fallback if neither is configured)
-
-   **Registry Base URL Priority:**
-   - **Job-level configuration** (overrides global, but may be blocked by script security sandbox)
-   - **Global configuration** (used if job-level is not set, but may be blocked by script security sandbox)
-   - **MCPX_REGISTRY_BASE_URL environment variable** (works even if script security blocks configuration access)
-   - **Default value**: `https://registry.modelcontextprotocol.io` (fallback if none are configured)
-
-   **Note**: If script security sandbox blocks access to configuration (you'll see warnings about `getRawBuild` and `McpxGlobalConfiguration.get`), you can either:
-   - **Recommended workaround**: Set environment variables in the job configuration:
-     - `MCPX_CLI_PATH` = `/path/to/mcpx-cli` (absolute path)
-     - `MCPX_REGISTRY_BASE_URL` = `https://your-registry-url.com` (your configured registry base URL)
-   - **Alternative**: Approve the script signatures in Manage Jenkins → In-process Script Approval:
-     - `method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild`
-     - `staticMethod io.modelcontextprotocol.jenkins.McpxGlobalConfiguration get`
-
-2. Fetches server details using `mcpx-cli` to extract package information (identifier, version, runtime arguments, environment variables)
-3. Constructs the appropriate command based on the registry type (`MCPX_REGISTRY_TYPE`)
-4. Maps `MCPX_*` environment variables to actual environment variables and runtime arguments
-5. Executes the server on the labeled agent
+1. **Show MCP Server**: Displays the selected server
+2. **Show Package Parameters**: Lists all `MCPX_*` environment variables
+3. **Run MCP Server**: Fetches server details, builds the command based on registry type, and executes it
 
 **Supported Registry Types:**
 
-- **Docker**: Constructs `docker run` commands with appropriate flags (`-p`, `-v`, `--network`, `-e`), environment variables, and arguments
+- **Docker**: Constructs `docker run` commands with flags (`-p`, `-v`, `--network`, `-e`), environment variables, and arguments
 - **Binary**: Executes the binary directly with runtime arguments
 - **npm**: Uses `npx` to run npm packages
 - **pypi/wheel**: Uses Python to run Python packages
 
-**Example: Running MCP Server Stage**
+**Example Usage in Shell Job:**
 
-```groovy
-properties([
-  parameters([
-    [$class: 'io.modelcontextprotocol.jenkins.parameters.McpxServerParameterDefinition', name: 'MCP_SERVER', description: 'Select an MCP server', defaultServer: '']
-  ])
-])
+```bash
+# The script automatically:
+# 1. Reads MCP_SERVER and MCPX_* environment variables
+# 2. Fetches server details using mcpx-cli
+# 3. Parses package configuration
+# 4. Builds and executes the appropriate command
 
-// Helper functions to get configuration (using @NonCPS to bypass sandbox)
-// Must be defined at top level, not inside script block
-@NonCPS
-def getJobCliPath() {
-  try {
-    def job = currentBuild.rawBuild.project
-    def jobProperty = job.getProperty(io.modelcontextprotocol.jenkins.McpxJobProperty.class)
-    if (jobProperty != null) {
-      def path = jobProperty.getCliPath()
-      return (path != null && path.trim() != '') ? path.trim() : null
-    }
-    return null
-  } catch (Exception e) {
-    return null
-  }
-}
-
-@NonCPS
-def getGlobalCliPath() {
-  try {
-    def globalConfig = io.modelcontextprotocol.jenkins.McpxGlobalConfiguration.get()
-    if (globalConfig != null) {
-      def path = globalConfig.getCliPath()
-      return (path != null && path.trim() != '') ? path.trim() : null
-    }
-    return null
-  } catch (Exception e) {
-    return null
-  }
-}
-
-@NonCPS
-def getJobRegistryBaseUrl() {
-  try {
-    def job = currentBuild.rawBuild.project
-    def jobProperty = job.getProperty(io.modelcontextprotocol.jenkins.McpxJobProperty.class)
-    if (jobProperty != null) {
-      def url = jobProperty.getRegistryBaseUrl()
-      return (url != null && url.trim() != '') ? url.trim() : null
-    }
-    return null
-  } catch (Exception e) {
-    return null
-  }
-}
-
-@NonCPS
-def getGlobalRegistryBaseUrl() {
-  try {
-    def globalConfig = io.modelcontextprotocol.jenkins.McpxGlobalConfiguration.get()
-    if (globalConfig != null) {
-      def url = globalConfig.getRegistryBaseUrl()
-      return (url != null && url.trim() != '') ? url.trim() : null
-    }
-    return null
-  } catch (org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException e) {
-    // Script security sandbox is blocking access to global configuration
-    return null
-  } catch (java.lang.SecurityException e) {
-    // Security exception when accessing global configuration
-    return null
-  } catch (Exception e) {
-    // Any other exception
-    return null
-  }
-}
-
-pipeline {
-  agent {
-    label 'mcpx.jenkins'  // Run on labeled agent
-  }
-  stages {
-    stage('Show MCP Server') {
-      steps {
-        echo "Selected MCP server: ${env.MCP_SERVER}"
-      }
-    }
-    stage('Run MCP Server') {
-      when {
-        expression { env.MCP_SERVER != null && env.MCP_SERVER != '' }
-      }
-      steps {
-        script {
-          def registryType = env.MCPX_REGISTRY_TYPE ?: 'unknown'
-          echo "Running MCP server: ${env.MCP_SERVER}"
-          echo "Registry type: ${registryType}"
-
-          // Get CLI path and base URL from Jenkins plugin configuration
-          // Use @NonCPS helper functions to get values directly (bypasses sandbox)
-          def jobCliPath = getJobCliPath()
-          def globalCliPath = getGlobalCliPath()
-
-          // Get CLI path (job-level overrides global, then default)
-          def mcpxCliPath = null
-          if (jobCliPath != null) {
-            mcpxCliPath = jobCliPath  // Job-level overrides global
-          } else if (globalCliPath != null) {
-            mcpxCliPath = globalCliPath  // Use global if job-level not set
-          } else {
-            mcpxCliPath = 'mcpx-cli'  // Default fallback
-          }
-
-          // Get base URL from job-level or global configuration
-          // Priority: job-level > global > environment variable > default
-          def jobBaseUrl = getJobRegistryBaseUrl()
-          def globalBaseUrl = getGlobalRegistryBaseUrl()
-
-          def baseUrl = null
-          if (jobBaseUrl != null) {
-            baseUrl = jobBaseUrl
-            echo "Using job-level registry base URL: ${baseUrl}"
-          } else if (globalBaseUrl != null) {
-            baseUrl = globalBaseUrl
-            echo "Using global registry base URL: ${baseUrl}"
-          } else if (env.MCPX_REGISTRY_BASE_URL != null && env.MCPX_REGISTRY_BASE_URL.trim() != '') {
-            baseUrl = env.MCPX_REGISTRY_BASE_URL.trim()
-            echo "Using registry base URL from MCPX_REGISTRY_BASE_URL environment variable: ${baseUrl}"
-          } else {
-            baseUrl = 'https://registry.modelcontextprotocol.io'
-            echo "WARNING: Using default registry base URL: ${baseUrl}"
-            echo "Note: Global configuration access may be blocked by script security sandbox."
-            echo "      To use your configured 'Registry Base URL' from Global Configuration, either:"
-            echo "      1. Set MCPX_REGISTRY_BASE_URL environment variable in job configuration"
-            echo "      2. Approve script security for McpxGlobalConfiguration.get in Manage Jenkins → In-process Script Approval"
-          }
-
-          // Fetch server details to get package information
-          def serverJson = sh(
-            script: "${mcpxCliPath} --base-url=${baseUrl} server ${env.MCP_SERVER} --json",
-            returnStdout: true
-          ).trim()
-
-          def serverData = readJSON text: serverJson
-          def packageInfo = serverData.packages?.find { pkg ->
-            pkg.registryType == registryType
-          } ?: serverData.packages?.get(0)
-
-          // Build and execute command based on registry type
-          // (See test/jenkins/jenkins.file for complete implementation)
-        }
-      }
-    }
-  }
-}
+# No additional configuration needed - just run the script!
 ```
 
-For a complete implementation example, see `test/jenkins/jenkins.file` which includes the full logic for handling all registry types and configuration retrieval.
+**Configuration Priority:**
 
-### Using labeled agents in pipeline jobs
+The script uses the following priority for CLI path and registry URL:
 
-To run your pipeline job on a specific labeled agent (similar to "Restrict where this project can be run" in freestyle jobs), use the `agent` directive with a label:
+- **CLI Path**: Automatically set by the plugin with priority:
+  - User parameter (if set in "Build with Parameters")
+  - Job-level configuration (if configured in job settings)
+  - Global configuration (from Manage Jenkins → System)
+  - Default: `mcpx-cli`
+  - The script automatically expands `~` (tilde) in the path to the user's home directory
 
-```groovy
-properties([
-  parameters([
-    [$class: 'io.modelcontextprotocol.jenkins.parameters.McpxServerParameterDefinition', name: 'MCP_SERVER', description: 'Select an MCP server', defaultServer: '']
-  ])
-])
+- **Registry Base URL**: Automatically set by the plugin with priority:
+  - User parameter (if set in "Build with Parameters")
+  - Job-level configuration (if configured in job settings)
+  - Global configuration (from Manage Jenkins → System)
+  - Default: `https://mcpx.example.com`
 
-pipeline {
-  agent {
-    label 'your-agent-label'
-  }
-  stages {
-    stage('Show selection') {
-      steps {
-        echo "Selected MCP server: ${env.MCP_SERVER}"
-      }
-    }
-  }
-}
-```
-
-**Note:** When you use a labeled agent in your pipeline job:
-- The pipeline will run on an agent matching that label
-- The "Test CLI" button in job configuration will use the controller with the global CLI Path configuration (as pipeline jobs don't expose labels during configuration time)
-
-**Assigning labels to agents:**
-1. Navigate to **Manage Jenkins** > **Manage Nodes and Clouds**
-2. Click on the agent you wish to label
-3. Click **Configure**
-4. In the **Labels** field, enter the desired labels separated by spaces
-5. Click **Save**
+**Note:** Both `MCPX_CLI_PATH` and `MCPX_REGISTRY_BASE_URL` are automatically injected by the plugin, so you don't need to configure them manually. However, you can override them by:
+- Adding them as String parameters in your job configuration to make them available in "Build with Parameters"
+- Or setting them in Build Environment → Use custom environment variables
 
 ## Trigger via Jenkins API
 
@@ -694,7 +466,7 @@ MCPX_PORT='9000' MCPX_MCP_LOG_LEVEL='DEBUG' ./test/jenkins/jenkins.sh
    ./test/jenkins/jenkins.sh
    ```
 
-3. **Check console output**: The pipeline in `test/jenkins/jenkins.file` will display all `MCPX_*` environment variables, showing both defaults and overrides.
+3. **Check console output**: The job (Pipeline or Shell) will display all `MCPX_*` environment variables, showing both defaults and overrides.
 
 ### Output
 
@@ -745,7 +517,7 @@ mvn -ntp -Dspotbugs.skip package
 
 - Test CLI fails on job config page
     - Ensure the path is correct on the target node (controller or labeled agent)
-    - Use absolute paths (e.g., `/usr/local/bin/mcpx-cli` or `/home/jenkins/.local/bin/mcpx-cli`) instead of paths with `~`
+    - You can use absolute paths (e.g., `/usr/local/bin/mcpx-cli` or `/home/jenkins/.local/bin/mcpx-cli`) or paths with `~` (e.g., `~/.local/bin/mcpx-cli`) - the bash script will automatically expand `~` to the user's home directory
     - If the job field is empty, the global CLI Path is used
     - Works for both freestyle projects and pipeline jobs
 
@@ -756,51 +528,6 @@ mvn -ntp -Dspotbugs.skip package
     - Confirm Registry Base URL is set in Manage Jenkins → System → MCPX Registry
     - Click "Probe" in parameter configuration to see where it ran and what JSON the CLI returned; then check again
     - Check Jenkins logs for lines starting with "Failed to fetch via mcpx-cli" for details
-
-- Probe failed: `Cannot run program "/var/jenkins_home/.local/bin/mcpx-cli": error=2`
-  - mcpx-cli is not installed at that path on the controller. Options:
-    - Install mcpx-cli on the controller at the configured path, or update Global "CLI Path" to a valid absolute path (e.g., `/home/jenkins/.local/bin/mcpx-cli`)
-    - Alternatively, configure your job with a label to run on an agent where mcpx-cli is installed and set the job-level "CLI Path" to the agent's absolute path (e.g., `/home/jenkins/.local/bin/mcpx-cli`). For freestyle projects, the plugin prefers the job's labeled agent for Refresh/Probe when available
-    - **Important**: Use absolute paths (starting with `/`) instead of paths with `~` in the CLI Path configuration
-
-- Parameter value is null or empty in pipeline execution
-    - Ensure the parameter is properly defined in the Jenkinsfile using the correct `$class` name
-    - Verify that the parameter value is being set in "Build with Parameters" or via API
-    - Check that the default value is configured if you want it to be used when the field is left empty
-    - The parameter now properly supports JSON deserialization for parameters defined in Jenkinsfiles
-
-- Package parameters are not being set as environment variables
-    - Ensure `MCP_SERVER` is set (either in job configuration or via "Build with Parameters")
-    - Verify that the server has a `packages` configuration with `runtimeArguments` or `environmentVariables`
-    - Check Jenkins logs for errors when fetching server details (look for "Failed to fetch server details" or "Failed to inject package parameters")
-    - Ensure mcpx-cli is available and can fetch server details (test with "Probe" button)
-    - Package parameters are only extracted from the first package in the `packages` array
-    - User-provided parameter values take precedence over package defaults
-    - For named arguments with short names (like `-p`), ensure `valueHint` is provided for more descriptive parameter names
-
-- Pipeline shows "Using fallback CLI path: mcpx-cli" even though CLI Path is configured
-    - This happens when script security sandbox blocks access to configuration (you'll see warnings about `getRawBuild` and `McpxGlobalConfiguration.get`)
-    - **Solution 1 (Recommended)**: Set `MCPX_CLI_PATH` environment variable in the job configuration:
-      1. Configure job → Build Environment → Use custom environment variables (or add in pipeline `environment` block)
-      2. Add variable: `MCPX_CLI_PATH` = `/home/lemonjia/.local/bin/mcpx-cli` (use the absolute path)
-    - **Solution 2**: Approve script signatures:
-      1. Go to Manage Jenkins → In-process Script Approval
-      2. Approve the signatures for:
-         - `method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild`
-         - `staticMethod io.modelcontextprotocol.jenkins.McpxGlobalConfiguration get`
-    - The environment variable approach works immediately without requiring script approval
-
-- Pipeline shows "WARNING: Using default registry base URL" even though Registry Base URL is set in Global Configuration
-    - This happens when script security sandbox blocks access to global configuration (you'll see warnings about `McpxGlobalConfiguration.get`)
-    - The pipeline will show which source is being used and provide clear warnings when falling back to defaults
-    - **Solution 1 (Recommended)**: Set `MCPX_REGISTRY_BASE_URL` environment variable in the job configuration:
-      1. Configure job → Build Environment → Use custom environment variables (or add in pipeline `environment` block)
-      2. Add variable: `MCPX_REGISTRY_BASE_URL` = `https://your-registry-url.com` (use the same value you set in Global Configuration)
-    - **Solution 2**: Approve script signature:
-      1. Go to Manage Jenkins → In-process Script Approval
-      2. Approve the signature for: `staticMethod io.modelcontextprotocol.jenkins.McpxGlobalConfiguration get`
-    - The environment variable approach works immediately without requiring script approval
-    - **Priority order**: Job-level configuration > Global configuration > `MCPX_REGISTRY_BASE_URL` environment variable > Default (`https://registry.modelcontextprotocol.io`)
 
 ## License
 
