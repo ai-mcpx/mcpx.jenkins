@@ -92,7 +92,7 @@ Parameters are automatically named based on their type:
 - **Named runtime arguments**:
   - If `valueHint` is present: `MCPX_<VALUE_HINT>` (e.g., `-p` with `valueHint: "port_mapping"` → `MCPX_PORT_MAPPING`)
   - Otherwise: `MCPX_<ARG_NAME>` (e.g., `--port` → `MCPX_PORT`, `--host` → `MCPX_HOST`)
-- **Positional runtime arguments**: `MCPX_<VALUE_HINT>` (e.g., `port_mapping` → `MCPX_PORT_MAPPING`)
+- **Positional runtime arguments**: `MCPX_<VALUE_HINT>` (e.g., `port_mapping` → `MCPX_PORT_MAPPING` for HTTP mode, `volume_mapping` → `MCPX_VOLUME_MAPPING` for STDIO mode)
 - **Environment variables**: `MCPX_<VAR_NAME>` (e.g., `GERRIT_BASE_URL` → `MCPX_GERRIT_BASE_URL`)
 
 ### Default Values
@@ -215,7 +215,8 @@ To use package parameters in "Build with Parameters", you can add them as String
 1. Configure job → This build is parameterized → Add parameter → String Parameter
 2. Name the parameter using the naming convention:
    - `MCPX_REGISTRY_TYPE` - Registry type from the package (e.g., `docker`, `binary`, `npm`, `pypi`, `wheel`)
-   - `MCPX_PORT`, `MCPX_HOST`, etc. - Runtime arguments from the package
+   - `MCPX_PORT`, `MCPX_HOST`, `MCPX_PORT_MAPPING`, `MCPX_NETWORK_MODE` - Runtime arguments for HTTP mode
+   - `MCPX_VOLUME_MAPPING` - Runtime argument for STDIO mode (volume mount)
    - `MCPX_GERRIT_BASE_URL`, `MCPX_MCP_LOG_LEVEL`, etc. - Environment variables from the package
 3. Leave the default value empty - it will be automatically set from the package when `MCP_SERVER` is configured
 
@@ -322,6 +323,8 @@ For **Freestyle projects** (shell jobs), use the bash script `test/jenkins/jenki
 **Supported Registry Types:**
 
 - **Docker**: Constructs `docker run` commands with flags (`-p`, `-v`, `--network`, `-e`), environment variables, and arguments
+  - Supports both HTTP mode (with port mappings via `-p`) and STDIO mode (with volume mappings via `-v`)
+  - The script automatically adapts based on the package's `transport` type and `runtimeArguments` configuration
 - **Binary**: Executes the binary directly with runtime arguments
 - **npm**: Uses `npx` to run npm packages
 - **pypi/wheel**: Uses Python to run Python packages
@@ -371,8 +374,11 @@ When triggering a build via API, you can optionally pass package parameters to o
 # Basic trigger with MCP_SERVER only
 curl "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?MCP_SERVER=io.modelcontextprotocol.anonymous%2Fgerrit-mcp-server&token=YOUR_TOKEN"
 
-# Trigger with MCP_SERVER and package parameter overrides
-curl "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?MCP_SERVER=io.modelcontextprotocol.anonymous%2Fgerrit-mcp-server&MCPX_REGISTRY_TYPE=binary&MCPX_PORT=9000&MCPX_MCP_LOG_LEVEL=DEBUG&token=YOUR_TOKEN"
+# Trigger with MCP_SERVER and package parameter overrides (HTTP mode)
+curl "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?MCP_SERVER=io.modelcontextprotocol.anonymous%2Fgerrit-mcp-server&MCPX_REGISTRY_TYPE=docker&MCPX_PORT=9000&MCPX_PORT_MAPPING=9000:8000&MCPX_MCP_LOG_LEVEL=DEBUG&token=YOUR_TOKEN"
+
+# Trigger with MCP_SERVER and package parameter overrides (STDIO mode)
+curl "${BASE_URL}/job/${JOB_NAME}/buildWithParameters?MCP_SERVER=io.modelcontextprotocol.anonymous%2Fgerrit-mcp-server&MCPX_REGISTRY_TYPE=docker&MCPX_VOLUME_MAPPING=%24%7BPWD%7D%3A%2Fworkspace&MCPX_GERRIT_BASE_URL=https%3A%2F%2Fcustom-gerrit.example.com%2F&token=YOUR_TOKEN"
 ```
 
 **Note:** Package parameters are automatically set from the server's packages when `MCP_SERVER` is provided. Passing them explicitly will override the defaults.
@@ -418,12 +424,17 @@ MCP_SERVER='io.modelcontextprotocol.anonymous/gerrit-mcp-server'
 
 # Package parameters (optional - these will override defaults from packages)
 # Uncomment and set values to test parameter overrides:
-# MCPX_PORT='8005'                    # Named runtime argument: --port
-# MCPX_HOST='0.0.0.0'                # Named runtime argument: --host
-# MCPX_PORT_MAPPING='8004:8000'      # Named runtime argument with valueHint: -p -> port_mapping
+# MCPX_PORT='8005'                    # Named runtime argument: --port (for HTTP mode)
+# MCPX_HOST='0.0.0.0'                # Named runtime argument: --host (for HTTP mode)
+# MCPX_PORT_MAPPING='8004:8000'      # Named runtime argument with valueHint: -p -> port_mapping (for HTTP mode)
+# MCPX_VOLUME_MAPPING='${PWD}:/workspace'  # Positional runtime argument: volume_mapping (for STDIO mode)
+# MCPX_NETWORK_MODE='host'           # Positional runtime argument: network_mode (for HTTP mode)
 # MCPX_MCP_LOG_LEVEL='DEBUG'         # Environment variable: MCP_LOG_LEVEL
 # MCPX_MCP_DATA_DIR='/custom/data'   # Environment variable: MCP_DATA_DIR
 # MCPX_GERRIT_BASE_URL='https://custom-gerrit.example.com/'  # Environment variable: GERRIT_BASE_URL
+#
+# Note: For STDIO mode (transport type "stdio"), port mappings and network mode are not needed.
+#       Volume mappings are commonly used for STDIO mode to provide configuration access.
 
 # Set to 'true' to enable DEBUG output, 'false' to disable
 DEBUG_ENABLED='true'
@@ -435,8 +446,10 @@ DEBUG_ENABLED='true'
 - `MCP_SERVER`: The MCP server identifier to pass as the `MCP_SERVER` parameter (e.g., `io.modelcontextprotocol.anonymous/gerrit-mcp-server`). The script automatically URL-encodes this value (e.g., `/` becomes `%2F`) when making the API request.
 - **Package Parameters** (optional): Set any `MCPX_*` environment variables to override defaults from the server's packages. The script will automatically include them in the build request if they are set. Examples:
   - `MCPX_REGISTRY_TYPE`: Override registry type from `registryType` in the package (e.g., `docker`, `binary`, `npm`, `pypi`, `wheel`)
-  - `MCPX_PORT`: Override port from `--port` runtime argument
-  - `MCPX_PORT_MAPPING`: Override port mapping (from `-p` with `valueHint: "port_mapping"` or positional argument)
+  - `MCPX_PORT`: Override port from `--port` runtime argument (for HTTP mode)
+  - `MCPX_PORT_MAPPING`: Override port mapping (from `-p` with `valueHint: "port_mapping"` or positional argument, for HTTP mode)
+  - `MCPX_VOLUME_MAPPING`: Override volume mapping (from positional argument with `valueHint: "volume_mapping"`, for STDIO mode)
+  - `MCPX_NETWORK_MODE`: Override network mode (from positional argument with `valueHint: "network_mode"`, for HTTP mode)
   - `MCPX_MCP_LOG_LEVEL`: Override logging level from `MCP_LOG_LEVEL` environment variable
   - `MCPX_MCP_DATA_DIR`: Override data directory from `MCP_DATA_DIR` environment variable
   - `MCPX_GERRIT_BASE_URL`: Override Gerrit URL from `GERRIT_BASE_URL` environment variable
@@ -463,10 +476,18 @@ MCPX_PORT='9000' MCPX_MCP_LOG_LEVEL='DEBUG' ./test/jenkins/jenkins.sh
 
 2. **Test with overrides**: Set package parameter variables before running the script to override defaults:
    ```bash
-   MCPX_REGISTRY_TYPE='binary' \
+   # For HTTP mode:
+   MCPX_REGISTRY_TYPE='docker' \
    MCPX_PORT='9000' \
    MCPX_MCP_LOG_LEVEL='DEBUG' \
    MCPX_PORT_MAPPING='9000:8000' \
+   ./test/jenkins/jenkins.sh
+
+   # For STDIO mode:
+   MCPX_REGISTRY_TYPE='docker' \
+   MCPX_MCP_LOG_LEVEL='DEBUG' \
+   MCPX_VOLUME_MAPPING='${PWD}:/workspace' \
+   MCPX_GERRIT_BASE_URL='https://custom-gerrit.example.com/' \
    ./test/jenkins/jenkins.sh
    ```
 

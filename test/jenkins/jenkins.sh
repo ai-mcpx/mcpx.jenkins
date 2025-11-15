@@ -10,12 +10,17 @@ MCP_SERVER='io.modelcontextprotocol.anonymous/gerrit-mcp-server'
 # You can override defaults by passing these parameters
 # Examples based on common package structures:
 # MCPX_REGISTRY_TYPE='docker'        # Package metadata: registryType (e.g., docker, binary, npm, pypi, wheel)
-# MCPX_PORT='8005'                   # Named runtime argument: --port
-# MCPX_HOST='0.0.0.0'                # Named runtime argument: --host
-# MCPX_PORT_MAPPING='8004:8000'      # Named runtime argument with valueHint: -p -> port_mapping
+# MCPX_PORT='8005'                   # Named runtime argument: --port (for HTTP mode)
+# MCPX_HOST='0.0.0.0'                # Named runtime argument: --host (for HTTP mode)
+# MCPX_PORT_MAPPING='8004:8000'      # Named runtime argument with valueHint: -p -> port_mapping (for HTTP mode)
+# MCPX_VOLUME_MAPPING='${PWD}:/workspace'  # Positional runtime argument: volume_mapping (for STDIO mode)
+# MCPX_NETWORK_MODE='host'           # Positional runtime argument: network_mode (for HTTP mode)
 # MCPX_MCP_LOG_LEVEL='DEBUG'         # Environment variable: MCP_LOG_LEVEL
 # MCPX_MCP_DATA_DIR='/custom/data'   # Environment variable: MCP_DATA_DIR
 # MCPX_GERRIT_BASE_URL='https://custom-gerrit.example.com/'  # Environment variable: GERRIT_BASE_URL
+#
+# Note: For STDIO mode (transport type "stdio"), port mappings and network mode are not needed.
+#       Volume mappings are commonly used for STDIO mode to provide configuration access.
 
 # Debug configuration
 DEBUG_ENABLED='true'
@@ -56,6 +61,14 @@ fi
 if [[ -n "${MCPX_PORT_MAPPING:-}" ]]; then
   PARAMS="${PARAMS}&MCPX_PORT_MAPPING=$(printf '%s\n' "$MCPX_PORT_MAPPING" | sed 's| |%20|g')"
   debug_echo "Adding package parameter: MCPX_PORT_MAPPING=${MCPX_PORT_MAPPING}"
+fi
+if [[ -n "${MCPX_VOLUME_MAPPING:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_VOLUME_MAPPING=$(printf '%s\n' "$MCPX_VOLUME_MAPPING" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_VOLUME_MAPPING=${MCPX_VOLUME_MAPPING}"
+fi
+if [[ -n "${MCPX_NETWORK_MODE:-}" ]]; then
+  PARAMS="${PARAMS}&MCPX_NETWORK_MODE=$(printf '%s\n' "$MCPX_NETWORK_MODE" | sed 's| |%20|g')"
+  debug_echo "Adding package parameter: MCPX_NETWORK_MODE=${MCPX_NETWORK_MODE}"
 fi
 if [[ -n "${MCPX_MCP_LOG_LEVEL:-}" ]]; then
   PARAMS="${PARAMS}&MCPX_MCP_LOG_LEVEL=$(printf '%s\n' "$MCPX_MCP_LOG_LEVEL" | sed 's| |%20|g')"

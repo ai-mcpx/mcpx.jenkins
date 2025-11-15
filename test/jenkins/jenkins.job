@@ -5,6 +5,9 @@ set -uo pipefail
 # Jenkins Shell Job Script for MCP Server Execution
 # This script replaces the Pipeline script to avoid security issues
 # with Jenkins Pipeline script security sandbox
+#
+# Supports both HTTP mode (with port mappings) and STDIO mode (with volume mappings)
+# The script dynamically builds commands based on the package configuration
 
 echo "=== Jenkins MCP Server Job ==="
 echo ""
